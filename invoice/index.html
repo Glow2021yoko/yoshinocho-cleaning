@@ -1,0 +1,645 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<title>清掃費の請求</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: one narrow column like a paper slip; staff form on top, monthly ledger below. Owner gets a ledger tab. */
+:root{
+  --bg:#f3f4f1; --paper:#ffffff; --ink:#1d2523; --muted:#66706c; --line:#d9ddd8;
+  --accent:#1f5f5b; --accent-ink:#ffffff; --accent-soft:#e2eeec;
+  --good:#2d7a46; --good-soft:#e3f1e6; --warn:#a2641a; --warn-soft:#f7ecdc; --bad:#b23a32;
+  --f-body:"Zen Kaku Gothic New","Hiragino Kaku Gothic ProN","Noto Sans JP",system-ui,sans-serif;
+  --f-num:"IBM Plex Mono",ui-monospace,Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#141917; --paper:#1c2321; --ink:#e7ece9; --muted:#9aa5a0; --line:#2f3936;
+  --accent:#6cb8b1; --accent-ink:#0f1a18; --accent-soft:#1f3431;
+  --good:#7cc893; --good-soft:#1d3324; --warn:#e2ad62; --warn-soft:#382a17; --bad:#ef8a80; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#141917; --paper:#1c2321; --ink:#e7ece9; --muted:#9aa5a0; --line:#2f3936;
+  --accent:#6cb8b1; --accent-ink:#0f1a18; --accent-soft:#1f3431;
+  --good:#7cc893; --good-soft:#1d3324; --warn:#e2ad62; --warn-soft:#382a17; --bad:#ef8a80; color-scheme:dark}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.6;padding-inline:16px;padding-block:20px 48px}
+.wrap{max-width:640px;margin:0 auto;display:flex;flex-direction:column;gap:18px}
+header h1{font-size:22px;margin:0;letter-spacing:.02em;text-wrap:balance}
+header p{margin:2px 0 0;color:var(--muted);font-size:13px}
+.num{font-family:var(--f-num);font-variant-numeric:tabular-nums}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:18px}
+.card h2{font-size:16px;margin:0 0 12px}
+.lbl{font-size:12px;color:var(--muted);letter-spacing:.06em;display:block;margin-bottom:4px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.grid .full{grid-column:1/-1}
+@media (max-width:440px){.grid{grid-template-columns:1fr}}
+input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:9px 10px}
+input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.yen{position:relative}.yen input{padding-left:26px;font-family:var(--f-num);text-align:right}
+.yen::before{content:"¥";position:absolute;left:10px;top:9px;color:var(--muted);font-family:var(--f-num)}
+textarea{min-height:60px;resize:vertical}
+button{font:inherit;cursor:pointer;border-radius:7px;border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:8px 14px}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:700}
+button.small{padding:4px 10px;font-size:13px}
+button.link{border:none;background:none;color:var(--accent);padding:2px 4px;font-size:13px}
+button:disabled{opacity:.5;cursor:default}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.spread{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
+.total-line{border-top:1px dashed var(--line);margin-top:14px;padding-top:12px}
+.total-line .num{font-size:22px;font-weight:600}
+.msg{font-size:13px;min-height:1.2em}.msg.err{color:var(--bad)}.msg.ok{color:var(--good)}
+.tabs{display:flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:9px;padding:4px;align-self:flex-start}
+.tabs button{border:none;background:none;padding:6px 14px}
+.tabs button[aria-selected="true"]{background:var(--accent-soft);color:var(--accent);font-weight:700}
+.items{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+.items li{display:grid;grid-template-columns:auto 1fr auto;gap:4px 12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:start}
+.items li:last-child{border-bottom:none}
+.items .d{font-family:var(--f-num);font-size:13px;color:var(--muted);padding-top:2px}
+.items .body{min-width:0}
+.items .prop{font-weight:500}
+.items .bd{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.items .amt{text-align:right}
+.pill{display:inline-block;font-size:11px;padding:1px 8px;border-radius:99px;letter-spacing:.04em}
+.pill.paid{background:var(--good-soft);color:var(--good)}
+.pill.unpaid{background:var(--warn-soft);color:var(--warn)}
+.empty{color:var(--muted);font-size:14px;padding:8px 0}
+pre.slip{white-space:pre-wrap;font-family:var(--f-num);font-size:13px;background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:12px;margin:10px 0 0;overflow-x:auto}
+.staff-block{border-top:1px solid var(--line);padding-top:14px;margin-top:14px}
+.staff-block:first-of-type{border-top:none;margin-top:0;padding-top:0}
+.sum{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:6px}
+.sum div{background:var(--bg);border-radius:7px;padding:8px 10px}
+.sum .k{font-size:11px;color:var(--muted)}
+.sum .v{font-family:var(--f-num);font-size:17px;font-weight:600}
+@media (max-width:440px){.sum{grid-template-columns:1fr 1fr}}
+.note{font-size:12px;color:var(--muted)}
+.bill-box{margin-top:14px;background:var(--accent-soft);border-radius:8px;padding:12px 14px}
+.pill.billed{background:var(--accent-soft);color:var(--accent)}
+.bank{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+.inv-preview{margin-top:10px}
+.inv-preview img{display:block;width:100%;border:1px solid var(--line);border-radius:6px}
+.inv-preview p{font-size:12px;color:var(--muted);margin:6px 0 0}
+/* Invoice sheet: rendered off-screen at A4 width, always on white paper so the file looks the same in any theme */
+#invStage{position:absolute;left:-10000px;top:0;width:794px;pointer-events:none}
+.inv{width:794px;min-height:1123px;background:#fff;color:#1a1a1a;font-family:var(--f-body);padding:64px 60px;box-sizing:border-box;font-size:13px;line-height:1.6}
+.inv h1{font-size:28px;letter-spacing:.6em;text-align:center;margin:0 0 30px;font-weight:700;padding-left:.6em}
+.inv .meta{display:flex;justify-content:flex-end;gap:24px;font-size:12px;margin-bottom:22px}
+.inv .meta span b{font-weight:500;color:#555;margin-right:6px}
+.inv .parties{display:flex;justify-content:space-between;align-items:flex-start;gap:24px}
+.inv .to{font-size:19px;border-bottom:1px solid #1a1a1a;padding-bottom:4px;min-width:300px}
+.inv .from{text-align:right;font-size:13px}
+.inv .from .nm{font-size:16px;font-weight:700}
+.inv .lead{margin:26px 0 10px}
+.inv .amount{display:flex;align-items:baseline;gap:18px;border:2px solid #1f5f5b;padding:12px 18px;width:fit-content}
+.inv .amount .k{font-size:14px}
+.inv .amount .v{font-family:var(--f-num);font-size:26px;font-weight:600}
+.inv table{width:100%;border-collapse:collapse;margin-top:26px;font-size:12px}
+.inv th{background:#e9f0ef;color:#1a1a1a;font-weight:700;padding:7px 8px;border:1px solid #c9d3d1;text-align:center}
+.inv td{padding:7px 8px;border:1px solid #d6dcdb;vertical-align:top}
+.inv td.n{text-align:right;font-family:var(--f-num);white-space:nowrap}
+.inv td.c{text-align:center;white-space:nowrap}
+.inv td small{display:block;color:#666;font-size:10.5px}
+.inv tfoot td{font-weight:700;background:#f6f8f8}
+.inv .bankbox{margin-top:26px;border:1px solid #c9d3d1;padding:12px 16px}
+.inv .bankbox .k{font-weight:700;margin-bottom:4px}
+.inv .foot{margin-top:18px;font-size:11px;color:#666}
+</style>
+<style>
+body{margin:0}
+[hidden]{display:none!important}
+img{max-width:100%}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>清掃費の請求</h1>
+    <p>清掃した日ごとに入力してください。月末にまとめて請求書になります。</p>
+  </header>
+
+  <div id="loading" class="card"><p class="empty">読み込み中…</p></div>
+  <div id="nodb" class="card" hidden>
+    <h2 id="nodbTitle">専用のURLから開いてください</h2>
+    <p class="note" id="nodbText">このページは、オーナーからLINEで届いた専用URLから開くと使えます。</p>
+  </div>
+
+
+  <!-- STAFF VIEW -->
+  <section id="staff" hidden style="display:flex;flex-direction:column;gap:18px">
+    <div class="card" id="profileCard">
+      <div class="spread">
+        <h2 style="margin:0">請求者・振込先</h2>
+        <button class="link" id="editName" hidden>変更</button>
+      </div>
+      <div id="nameShow" hidden style="margin-top:6px">
+        <div class="prop" id="nameShowName"></div>
+        <div class="bd" id="nameShowBank" style="font-size:13px;color:var(--muted)"></div>
+      </div>
+      <form id="nameForm" style="margin-top:8px">
+        <div class="grid">
+          <div class="full"><label class="lbl" for="nameInput">お名前（請求書に載ります）</label>
+            <input id="nameInput" maxlength="40" placeholder="例：山田 花子" required></div>
+          <div><label class="lbl" for="bBank">銀行名</label><input id="bBank" maxlength="40" placeholder="例：横浜銀行" required></div>
+          <div><label class="lbl" for="bBranch">支店名</label><input id="bBranch" maxlength="40" placeholder="例：伊勢佐木町支店" required></div>
+          <div><label class="lbl" for="bType">口座種別</label>
+            <select id="bType"><option value="普通">普通</option><option value="当座">当座</option></select></div>
+          <div><label class="lbl" for="bNumber">口座番号</label><input id="bNumber" inputmode="numeric" maxlength="8" pattern="[0-9]{7,8}" placeholder="7桁" required></div>
+          <div class="full"><label class="lbl" for="bHolder">口座名義（カタカナ）</label><input id="bHolder" maxlength="40" placeholder="例：ヤマダ ハナコ" required></div>
+        </div>
+        <div class="spread" style="margin-top:12px">
+          <span class="note">口座情報はオーナーと本人にだけ表示されます。</span>
+          <div class="row"><button type="button" id="nameCancel" hidden>キャンセル</button><button class="primary" type="submit">保存</button></div>
+        </div>
+        <p class="msg" id="nameMsg"></p>
+      </form>
+    </div>
+
+    <form id="entryForm" class="card">
+      <h2 id="formTitle">勤務日を追加</h2>
+      <div class="grid">
+        <div><label class="lbl" for="fDate">勤務日</label><input id="fDate" type="date" required></div>
+        <div><label class="lbl" for="fProp">物件</label>
+          <select id="fProp" required>
+            <option value="Grand House（睦町）">Grand House（睦町）</option>
+            <option value="Good Tiny House（中村町）">Good Tiny House（中村町）</option>
+            <option value="その他">その他</option>
+          </select></div>
+        <div><label class="lbl" for="fClean">清掃費</label><div class="yen"><input id="fClean" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></div></div>
+        <div><label class="lbl" for="fPark">駐車場代</label><div class="yen"><input id="fPark" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></div></div>
+        <div><label class="lbl" for="fOther">その他の金額</label><div class="yen"><input id="fOther" type="number" inputmode="numeric" min="0" step="1" placeholder="0"></div></div>
+        <div><label class="lbl" for="fOtherNote">その他の内容</label><input id="fOtherNote" maxlength="60" placeholder="例：洗剤購入、コインランドリー"></div>
+        <div class="full"><label class="lbl" for="fMemo">メモ（任意）</label><textarea id="fMemo" maxlength="300" placeholder="気になった点、備品の補充など"></textarea></div>
+      </div>
+      <div class="total-line spread">
+        <span class="lbl" style="margin:0">この日の合計</span>
+        <span class="num" id="fTotal">¥0</span>
+      </div>
+      <div class="spread" style="margin-top:12px">
+        <span class="msg" id="fMsg"></span>
+        <div class="row">
+          <button type="button" id="fCancel" hidden>キャンセル</button>
+          <button class="primary" type="submit" id="fSubmit">追加する</button>
+        </div>
+      </div>
+    </form>
+
+    <div class="card">
+      <div class="spread">
+        <h2 style="margin:0">月ごとの記録</h2>
+        <input id="myMonth" type="month" style="width:auto">
+      </div>
+      <ul class="items" id="myList" style="margin-top:8px"></ul>
+      <div class="total-line spread">
+        <span class="lbl" style="margin:0">月合計（請求額）</span>
+        <span class="num" id="myTotal">¥0</span>
+      </div>
+      <div class="bill-box">
+        <div class="spread">
+          <span class="prop">この月を請求する</span>
+          <span class="pill unpaid" id="billState" hidden></span>
+        </div>
+        <div class="row" style="margin-top:8px;align-items:flex-end">
+          <div><label class="lbl" for="billDate">請求日</label><input id="billDate" type="date" style="width:auto"></div>
+          <button class="primary" id="billBtn" type="button">請求する</button>
+          <button id="unbillBtn" type="button" hidden>請求を取り消す</button>
+        </div>
+        <p class="msg" id="billMsg"></p>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button class="primary" id="pdfBtn" type="button">請求書をPDFで保存</button>
+        <button id="pngBtn" type="button">画像で保存</button>
+        <button class="link" id="showSlip" type="button">文面をコピー</button>
+      </div>
+      <p class="msg" id="slipMsg"></p>
+      <div id="myPreview" class="inv-preview" hidden></div>
+      <pre class="slip" id="slip" hidden></pre>
+      <p class="note" style="margin:10px 0 0">月の勤務を入れ終わったら、請求日を選んで「請求する」を押してください。オーナーに請求が届きます。LINEで請求書を送る必要はありません。支払い済みの記録は編集できません。</p>
+    </div>
+  </section>
+
+  <!-- ADMIN VIEW -->
+  <section id="admin" hidden style="display:flex;flex-direction:column;gap:18px">
+    <div class="card">
+      <div class="spread">
+        <h2 style="margin:0">月次の請求一覧</h2>
+        <button class="link" id="adReload" type="button">最新にする</button>
+        <input id="adMonth" type="month" style="width:auto">
+      </div>
+      <div class="sum" style="margin-top:12px">
+        <div><div class="k">請求合計</div><div class="v" id="adTotal">¥0</div></div>
+        <div><div class="k">未払い</div><div class="v" id="adUnpaid">¥0</div></div>
+        <div><div class="k">勤務日数</div><div class="v" id="adCount">0</div></div>
+      </div>
+      <div id="adStaff" style="margin-top:14px"></div>
+      <div class="row" style="margin-top:14px">
+        <button id="copyCsv">この月をCSVでコピー</button>
+        <span class="msg" id="csvMsg"></span>
+      </div>
+    </div>
+    <form id="cfgForm" class="card">
+      <h2>請求書の宛名</h2>
+      <div class="row">
+        <input id="cfgPayee" maxlength="60" placeholder="例：〇〇合同会社 御中" style="flex:1;min-width:200px">
+        <button class="primary" type="submit">保存</button>
+      </div>
+      <p class="msg" id="cfgMsg"></p>
+    </form>
+  </section>
+</div>
+
+<div id="invStage" aria-hidden="true"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script>
+/* ===== 設定：Apps Script を公開したときのURLをここに貼る ===== */
+const API_URL = "ここにApps ScriptのウェブアプリURLを貼る";
+/* ============================================================== */
+
+const $ = id => document.getElementById(id);
+const qs = new URLSearchParams(location.search);
+const TOKEN = qs.get("t") || "";
+const ADMIN = qs.get("admin") || "";
+const yen = n => "¥" + (Number(n)||0).toLocaleString("ja-JP");
+const int = v => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 ? n : 0; };
+const today = () => { const d = new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
+const thisMonth = () => today().slice(0,7);
+const sumOf = it => int(it.cleaning)+int(it.parking)+int(it.otherAmt);
+const jpMonth = m => { const [y,mo] = m.split("-"); return `${y}年${Number(mo)}月`; };
+const fmtDate = d => { const [,m,dd] = d.split("-"); return `${Number(m)}/${Number(dd)}`; };
+const slashDate = d => d ? d.replace(/-/g,"/") : "";
+const bankLine = b => b && b.bank ? `${b.bank} ${b.branch} ${b.type} ${b.number} ${b.holder}` : "";
+function flash(el, text, kind){ el.textContent = text; el.className = "msg " + (kind||""); if(kind==="ok") setTimeout(()=>{ if(el.textContent===text) el.textContent=""; }, 2500); }
+async function copyText(text, msgEl, fallbackEl){
+  try { await navigator.clipboard.writeText(text); flash(msgEl, "コピーしました", "ok"); }
+  catch { if (fallbackEl){ const r=document.createRange(); r.selectNodeContents(fallbackEl); const s=getSelection(); s.removeAllRanges(); s.addRange(r);} flash(msgEl, "選択した文字をコピーしてください", ""); }
+}
+function itemLine(it){
+  const parts = [];
+  if (int(it.cleaning)) parts.push("清掃 " + yen(it.cleaning));
+  if (int(it.parking)) parts.push("駐車場 " + yen(it.parking));
+  if (int(it.otherAmt)) parts.push((it.otherNote||"その他") + " " + yen(it.otherAmt));
+  return parts.join(" / ");
+}
+function monthItems(items, month){
+  return items.filter(it => (it.date||"").startsWith(month))
+    .sort((a,b)=> a.date < b.date ? -1 : a.date > b.date ? 1 : String(a.createdAt).localeCompare(String(b.createdAt)));
+}
+
+/* ---------- サーバーとのやりとり ---------- */
+async function api(action, payload = {}){
+  let res;
+  try {
+    res = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action, token: TOKEN, admin: ADMIN, ...payload }) });
+  } catch { throw new Error("通信できませんでした。電波の良いところでもう一度お試しください"); }
+  let j; try { j = await res.json(); } catch { throw new Error("サーバーから正しい返事がありませんでした"); }
+  if (!j.ok) throw new Error(j.error || "エラーが発生しました");
+  return j;
+}
+
+let payee = "";
+
+/* ---------- 請求書（PDF / 画像） ---------- */
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const invNo = (key, month) => { let h = 0; for (const ch of key) h = (h*31 + ch.charCodeAt(0)) >>> 0; return month.replace("-","") + "-" + (h % 10000).toString().padStart(4,"0"); };
+function buildSlip(profile, month, list, billed){
+  const total = list.reduce((s,it)=>s+sumOf(it),0);
+  const lines = [`請求書　${jpMonth(month)}分`, `宛先：${payee || "（宛名未設定）"}`, `請求者：${profile.name || "—"}`, `請求日：${billed ? slashDate(billed) : "（未請求）"}`, "", "【明細】"];
+  for (const it of list) lines.push(`${fmtDate(it.date)}　${it.property}　${itemLine(it)}　計 ${yen(sumOf(it))}`);
+  const c = list.reduce((s,it)=>s+int(it.cleaning),0), p = list.reduce((s,it)=>s+int(it.parking),0), o = list.reduce((s,it)=>s+int(it.otherAmt),0);
+  lines.push("", `清掃費 ${yen(c)}　駐車場代 ${yen(p)}　その他 ${yen(o)}`, `合計請求額：${yen(total)}（${list.length}日）`, "", "【お振込先】", bankLine(profile.bank) || "（未登録）");
+  return lines.join("\n");
+}
+function invoiceHTML(key, profile, month, list, billed){
+  const total = list.reduce((s,it)=>s+sumOf(it),0);
+  const c = list.reduce((s,it)=>s+int(it.cleaning),0), p = list.reduce((s,it)=>s+int(it.parking),0), o = list.reduce((s,it)=>s+int(it.otherAmt),0);
+  const b = profile.bank || {};
+  const rows = list.map(it => `<tr>
+    <td class="c">${esc(fmtDate(it.date))}</td>
+    <td>${esc(it.property)}</td>
+    <td class="n">${int(it.cleaning) ? yen(it.cleaning) : ""}</td>
+    <td class="n">${int(it.parking) ? yen(it.parking) : ""}</td>
+    <td class="n">${int(it.otherAmt) ? yen(it.otherAmt) : ""}${it.otherNote ? `<small>${esc(it.otherNote)}</small>` : ""}</td>
+    <td class="n">${yen(sumOf(it))}</td></tr>`).join("");
+  return `<div class="inv">
+    <h1>請求書</h1>
+    <div class="meta"><span><b>請求番号</b>${esc(invNo(key, month))}</span><span><b>請求日</b>${esc(slashDate(billed || today()))}</span></div>
+    <div class="parties">
+      <div class="to">${esc(payee || "　　　　　　　　 御中")}</div>
+      <div class="from"><div class="nm">${esc(profile.name || "")}</div></div>
+    </div>
+    <p class="lead">${esc(jpMonth(month))}分の清掃業務について、下記のとおりご請求申し上げます。</p>
+    <div class="amount"><span class="k">ご請求金額</span><span class="v">${yen(total)}</span></div>
+    <table>
+      <thead><tr><th style="width:12%">勤務日</th><th>物件</th><th style="width:14%">清掃費</th><th style="width:13%">駐車場代</th><th style="width:17%">その他</th><th style="width:14%">小計</th></tr></thead>
+      <tbody>${rows}</tbody>
+      <tfoot><tr><td class="c" colspan="2">合計（${list.length}日）</td><td class="n">${yen(c)}</td><td class="n">${yen(p)}</td><td class="n">${yen(o)}</td><td class="n">${yen(total)}</td></tr></tfoot>
+    </table>
+    <div class="bankbox"><div class="k">お振込先</div>${b.bank ? esc(`${b.bank}　${b.branch}　${b.type}　${b.number}`) + "<br>口座名義：" + esc(b.holder) : "（未登録）"}</div>
+    <p class="foot">お振込手数料はご負担くださいますようお願いいたします。</p>
+  </div>`;
+}
+async function renderInvoiceCanvas(...args){
+  if (!window.html2canvas || !window.jspdf) throw new Error("lib");
+  const stage = $("invStage"); stage.innerHTML = invoiceHTML(...args);
+  try { await document.fonts.ready; } catch {}
+  const canvas = await html2canvas(stage.firstElementChild, { scale: 2, backgroundColor: "#ffffff", logging: false });
+  stage.replaceChildren();
+  return canvas;
+}
+function canvasToPdfBlob(canvas){
+  const { jsPDF } = window.jspdf;
+  const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+  const pageW = 210, pageH = 297, pxPerPage = Math.floor(canvas.width * pageH / pageW);
+  for (let y = 0, i = 0; y < canvas.height; y += pxPerPage, i++){
+    const h = Math.min(pxPerPage, canvas.height - y);
+    const part = document.createElement("canvas"); part.width = canvas.width; part.height = h;
+    const ctx = part.getContext("2d"); ctx.fillStyle = "#fff"; ctx.fillRect(0,0,part.width,h); ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+    if (i) pdf.addPage();
+    pdf.addImage(part.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, pageW, h * pageW / canvas.width);
+  }
+  return pdf.output("blob");
+}
+function saveBlob(blob, filename){
+  const a = document.createElement("a"); a.href = URL.createObjectURL(blob); a.download = filename;
+  document.body.append(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+}
+async function exportInvoice(kind, key, profile, month, list, billed, msgEl, previewEl){
+  if (!list.length) return flash(msgEl, "この月の記録がありません", "err");
+  flash(msgEl, "作成中…", "");
+  let canvas;
+  try { canvas = await renderInvoiceCanvas(key, profile, month, list, billed); }
+  catch { return flash(msgEl, "請求書を作れませんでした。ページを開き直してもう一度お試しください", "err"); }
+  const base = `請求書_${(profile.name||"").replace(/\s+/g,"")}_${jpMonth(month)}`;
+  try {
+    const blob = kind === "pdf" ? canvasToPdfBlob(canvas) : await new Promise(r => canvas.toBlob(r, "image/png"));
+    saveBlob(blob, base + (kind === "pdf" ? ".pdf" : ".png"));
+    flash(msgEl, kind === "pdf" ? "PDFを保存しました" : "画像を保存しました", "ok");
+  } catch { flash(msgEl, "保存できませんでした", "err"); }
+  if (kind === "png" && previewEl){
+    previewEl.replaceChildren();
+    const img = document.createElement("img"); img.src = canvas.toDataURL("image/png"); img.alt = `${jpMonth(month)}分の請求書`;
+    const p = document.createElement("p"); p.textContent = "保存されない場合は、画像を長押しして保存してください。";
+    previewEl.append(img, p); previewEl.hidden = false;
+  }
+}
+
+/* ---------- スタッフ画面 ---------- */
+let me = { name: "", bank: null }, myItems = [], myBilled = {}, editingId = null;
+
+function profileComplete(){ return !!(me.name && me.bank && me.bank.bank && me.bank.number); }
+function fillProfileForm(){
+  const b = me.bank || {};
+  $("nameInput").value = me.name || ""; $("bBank").value = b.bank || ""; $("bBranch").value = b.branch || "";
+  $("bType").value = b.type || "普通"; $("bNumber").value = b.number || ""; $("bHolder").value = b.holder || "";
+}
+function renderProfile(){
+  const ok = profileComplete();
+  $("nameShow").hidden = !ok; $("editName").hidden = !ok;
+  if (ok){ $("nameShowName").textContent = me.name; $("nameShowBank").textContent = "振込先：" + bankLine(me.bank); $("nameForm").hidden = true; }
+  else { $("nameForm").hidden = false; $("nameCancel").hidden = true; fillProfileForm(); }
+  $("entryForm").querySelectorAll("input,select,textarea,button").forEach(el => el.disabled = !ok);
+  if (!ok) flash($("fMsg"), "先にお名前と振込先を保存してください", "");
+  else if ($("fMsg").textContent.startsWith("先にお名前")) $("fMsg").textContent = "";
+}
+function updateFormTotal(){ $("fTotal").textContent = yen(int($("fClean").value)+int($("fPark").value)+int($("fOther").value)); }
+function resetForm(){
+  editingId = null; $("entryForm").reset(); $("fDate").value = today();
+  $("formTitle").textContent = "勤務日を追加"; $("fSubmit").textContent = "追加する"; $("fCancel").hidden = true; updateFormTotal();
+}
+function renderBill(month, list){
+  const billed = myBilled[month];
+  const st = $("billState");
+  st.hidden = !billed; st.className = "pill billed"; st.textContent = billed ? `請求済（${slashDate(billed)}）` : "";
+  $("billBtn").textContent = billed ? "請求日を変更" : "請求する";
+  $("unbillBtn").hidden = !billed || list.some(it => it.paid);
+  $("billBtn").disabled = !list.length || !profileComplete();
+  if (document.activeElement !== $("billDate")) $("billDate").value = billed || today();
+}
+function renderMine(){
+  const month = $("myMonth").value || thisMonth();
+  const list = monthItems(myItems, month);
+  const ul = $("myList"); ul.replaceChildren();
+  if (!list.length){ const li=document.createElement("li"); li.className="empty"; li.style.display="block"; li.textContent = `${jpMonth(month)}の記録はまだありません。上のフォームから追加してください。`; ul.append(li); }
+  let total = 0;
+  for (const it of list){
+    total += sumOf(it);
+    const li = document.createElement("li");
+    const d = document.createElement("span"); d.className="d"; d.textContent = fmtDate(it.date);
+    const b = document.createElement("div"); b.className="body";
+    const p = document.createElement("div"); p.className="prop"; p.textContent = it.property;
+    const bd = document.createElement("div"); bd.className="bd"; bd.textContent = itemLine(it) + (it.memo ? "　メモ：" + it.memo : "");
+    b.append(p, bd);
+    const a = document.createElement("div"); a.className="amt";
+    const n = document.createElement("div"); n.className="num"; n.textContent = yen(sumOf(it));
+    const pill = document.createElement("span"); pill.className = "pill " + (it.paid?"paid":"unpaid"); pill.textContent = it.paid ? "支払済" : "未払い";
+    a.append(n, pill);
+    if (!it.paid){
+      const row = document.createElement("div");
+      const e = document.createElement("button"); e.className="link"; e.type="button"; e.textContent="編集"; e.onclick=()=>startEdit(it);
+      const del = document.createElement("button"); del.className="link"; del.type="button"; del.textContent="削除";
+      del.onclick = async () => {
+        if (del.dataset.armed){
+          del.disabled = true;
+          try { await api("deleteItem", { id: it.id }); await loadMe(); flash($("fMsg"), "削除しました", "ok"); }
+          catch (err) { flash($("fMsg"), err.message, "err"); del.disabled = false; }
+        } else { del.dataset.armed="1"; del.textContent="本当に削除"; del.style.color="var(--bad)"; setTimeout(()=>{ delete del.dataset.armed; del.textContent="削除"; del.style.color=""; },3000); }
+      };
+      row.append(e, del); a.append(row);
+    }
+    li.append(d, b, a); ul.append(li);
+  }
+  $("myTotal").textContent = yen(total);
+  renderBill(month, list);
+}
+function startEdit(it){
+  editingId = it.id;
+  $("fDate").value = it.date; $("fProp").value = it.property;
+  $("fClean").value = int(it.cleaning)||""; $("fPark").value = int(it.parking)||""; $("fOther").value = int(it.otherAmt)||"";
+  $("fOtherNote").value = it.otherNote||""; $("fMemo").value = it.memo||"";
+  $("formTitle").textContent = `${fmtDate(it.date)} の記録を編集`; $("fSubmit").textContent = "更新する"; $("fCancel").hidden = false;
+  updateFormTotal(); $("entryForm").scrollIntoView({behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth"});
+}
+async function loadMe(){
+  const j = await api("me");
+  me = j.profile || { name: "", bank: null }; myItems = j.items || []; myBilled = j.billed || {}; payee = j.payee || "";
+  renderProfile(); renderMine();
+}
+
+function startStaff(){
+  $("staff").hidden = false;
+  $("fDate").value = today(); $("myMonth").value = thisMonth();
+  ["fClean","fPark","fOther"].forEach(id => $(id).addEventListener("input", updateFormTotal));
+  $("myMonth").addEventListener("change", () => { $("myPreview").hidden = true; $("slip").hidden = true; renderMine(); });
+  $("editName").onclick = () => { fillProfileForm(); $("nameForm").hidden = false; $("nameShow").hidden = true; $("editName").hidden = true; $("nameCancel").hidden = false; };
+  $("nameCancel").onclick = renderProfile;
+  $("nameForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const profile = { name: $("nameInput").value.trim(), bank: $("bBank").value.trim(), branch: $("bBranch").value.trim(), type: $("bType").value, number: $("bNumber").value.replace(/\D/g,""), holder: $("bHolder").value.trim() };
+    if (!/^\d{7,8}$/.test(profile.number)) return flash($("nameMsg"), "口座番号は7桁の数字で入れてください", "err");
+    const btn = e.submitter; if (btn) btn.disabled = true;
+    try { await api("saveProfile", { profile }); await loadMe(); flash($("nameMsg"), "保存しました", "ok"); }
+    catch (err) { flash($("nameMsg"), err.message, "err"); }
+    finally { if (btn) btn.disabled = false; }
+  });
+  $("fCancel").onclick = resetForm;
+  $("entryForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const item = { date: $("fDate").value, property: $("fProp").value, cleaning: int($("fClean").value), parking: int($("fPark").value), otherAmt: int($("fOther").value), otherNote: $("fOtherNote").value.trim(), memo: $("fMemo").value.trim() };
+    if (!item.date) return flash($("fMsg"), "勤務日を入れてください", "err");
+    if (!sumOf(item)) return flash($("fMsg"), "金額を1つ以上入れてください", "err");
+    if (item.otherAmt && !item.otherNote) return flash($("fMsg"), "その他の内容を書いてください", "err");
+    $("fSubmit").disabled = true; flash($("fMsg"), "保存中…", "");
+    try {
+      if (editingId) await api("updateItem", { id: editingId, item }); else await api("addItem", { item });
+      flash($("fMsg"), editingId ? "更新しました" : "追加しました", "ok");
+      $("myMonth").value = item.date.slice(0,7);
+      resetForm(); await loadMe();
+    } catch (err) { flash($("fMsg"), err.message, "err"); }
+    finally { $("fSubmit").disabled = !profileComplete(); }
+  });
+  $("billBtn").onclick = async () => {
+    const month = $("myMonth").value || thisMonth(); const date = $("billDate").value;
+    if (!date) return flash($("billMsg"), "請求日を選んでください", "err");
+    $("billBtn").disabled = true;
+    try { await api("bill", { month, date }); await loadMe(); flash($("billMsg"), `${jpMonth(month)}分を請求しました`, "ok"); }
+    catch (err) { flash($("billMsg"), err.message, "err"); $("billBtn").disabled = false; }
+  };
+  $("unbillBtn").onclick = async () => {
+    const month = $("myMonth").value || thisMonth();
+    try { await api("unbill", { month }); await loadMe(); flash($("billMsg"), "請求を取り消しました", "ok"); }
+    catch (err) { flash($("billMsg"), err.message, "err"); }
+  };
+  $("showSlip").onclick = () => {
+    const month = $("myMonth").value || thisMonth();
+    $("slip").textContent = buildSlip(me, month, monthItems(myItems, month), myBilled[month]);
+    $("slip").hidden = false;
+    copyText($("slip").textContent, $("slipMsg"), $("slip"));
+  };
+  const myExport = kind => { const month = $("myMonth").value || thisMonth(); exportInvoice(kind, TOKEN, me, month, monthItems(myItems, month), myBilled[month], $("slipMsg"), $("myPreview")); };
+  $("pdfBtn").onclick = () => myExport("pdf");
+  $("pngBtn").onclick = () => myExport("png");
+  renderProfile(); renderMine();
+  return loadMe();
+}
+
+/* ---------- 管理画面 ---------- */
+let ad = { staff: [], items: [], bills: [] };
+
+function renderAdmin(){
+  const month = $("adMonth").value || thisMonth();
+  const box = $("adStaff"); box.replaceChildren();
+  let total = 0, unpaid = 0, count = 0, shown = 0;
+  const staff = [...ad.staff].sort((a,b)=> (a.name||"").localeCompare(b.name||"","ja"));
+  for (const sd of staff){
+    const list = monthItems(ad.items.filter(it => it.token === sd.token), month);
+    if (!list.length) continue;
+    shown++;
+    const t = list.reduce((s,it)=>s+sumOf(it),0), up = list.filter(it=>!it.paid).reduce((s,it)=>s+sumOf(it),0);
+    total += t; unpaid += up; count += list.length;
+    const billed = (ad.bills.find(b => b.token === sd.token && b.month === month) || {}).date;
+    const blk = document.createElement("div"); blk.className = "staff-block";
+    const head = document.createElement("div"); head.className = "spread";
+    const left = document.createElement("div"); left.style.minWidth = "0";
+    const nm = document.createElement("div"); nm.className="prop"; nm.textContent = sd.name || "名前未登録";
+    const bk = document.createElement("div"); bk.className="bank"; bk.textContent = "振込先：" + (bankLine(sd.bank) || "未登録");
+    left.append(nm, bk);
+    const right = document.createElement("div"); right.className="row";
+    const tt = document.createElement("span"); tt.className="num"; tt.style.fontWeight="600"; tt.textContent = yen(t);
+    const bp = document.createElement("span"); bp.className = "pill " + (billed ? "billed" : "unpaid"); bp.textContent = billed ? `請求日 ${slashDate(billed)}` : "未請求";
+    const pill = document.createElement("span"); pill.className = "pill " + (up ? "unpaid":"paid"); pill.textContent = up ? `未払い ${yen(up)}` : "支払済";
+    right.append(tt, bp, pill);
+    head.append(left, right);
+    const ul = document.createElement("ul"); ul.className = "items";
+    for (const it of list){
+      const li = document.createElement("li");
+      const d = document.createElement("span"); d.className="d"; d.textContent = fmtDate(it.date);
+      const b = document.createElement("div"); b.className="body";
+      const p = document.createElement("div"); p.textContent = it.property;
+      const bd = document.createElement("div"); bd.className="bd"; bd.textContent = itemLine(it) + (it.memo ? "　メモ：" + it.memo : "");
+      b.append(p, bd);
+      const a = document.createElement("div"); a.className="amt";
+      const n = document.createElement("div"); n.className="num"; n.textContent = yen(sumOf(it));
+      const tg = document.createElement("button"); tg.type="button"; tg.className = "pill " + (it.paid?"paid":"unpaid"); tg.style.border="none"; tg.style.cursor="pointer";
+      tg.textContent = it.paid ? "支払済 ✓" : "未払い"; tg.title = "タップで切り替え";
+      tg.onclick = () => setPaid([it.id], !it.paid, tg);
+      a.append(n, tg);
+      li.append(d, b, a); ul.append(li);
+    }
+    blk.append(head, ul);
+    const actions = document.createElement("div"); actions.className = "row"; actions.style.marginTop = "8px";
+    if (up){
+      const all = document.createElement("button"); all.className="small"; all.type="button"; all.textContent = "この月をすべて支払済にする";
+      all.onclick = () => setPaid(list.filter(it=>!it.paid).map(it=>it.id), true, all);
+      actions.append(all);
+    }
+    const pv = document.createElement("div"); pv.className = "inv-preview"; pv.hidden = true;
+    const m = document.createElement("span"); m.className="msg";
+    const pb = document.createElement("button"); pb.className="small"; pb.type="button"; pb.textContent = "PDF";
+    const ib = document.createElement("button"); ib.className="small"; ib.type="button"; ib.textContent = "画像";
+    pb.onclick = () => exportInvoice("pdf", sd.token, sd, month, list, billed, m, pv);
+    ib.onclick = () => exportInvoice("png", sd.token, sd, month, list, billed, m, pv);
+    actions.append(pb, ib, m);
+    blk.append(actions, pv);
+    box.append(blk);
+  }
+  if (!shown){ const p = document.createElement("p"); p.className="empty"; p.textContent = `${jpMonth(month)}の請求はまだありません。スタッフが専用URLから入力すると、ここに届きます。`; box.append(p); }
+  $("adTotal").textContent = yen(total); $("adUnpaid").textContent = yen(unpaid); $("adCount").textContent = count;
+}
+async function setPaid(ids, paid, btn){
+  btn.disabled = true;
+  try { await api("setPaid", { ids, paid }); await loadAdmin(); }
+  catch (err) { flash($("csvMsg"), err.message, "err"); btn.disabled = false; }
+}
+function csvFor(month){
+  const q = v => `"${String(v??"").replace(/"/g,'""')}"`;
+  const rows = [["スタッフ","請求日","勤務日","物件","清掃費","駐車場代","その他","その他内容","合計","支払","メモ","振込先"].map(q).join(",")];
+  for (const sd of ad.staff){
+    const billed = (ad.bills.find(b => b.token === sd.token && b.month === month) || {}).date || "";
+    for (const it of monthItems(ad.items.filter(x => x.token === sd.token), month)){
+      rows.push([sd.name, billed, it.date, it.property, int(it.cleaning), int(it.parking), int(it.otherAmt), it.otherNote, sumOf(it), it.paid?"支払済":"未払い", it.memo, bankLine(sd.bank)].map(q).join(","));
+    }
+  }
+  return rows.join("\n");
+}
+async function loadAdmin(){
+  const j = await api("adminList");
+  ad = { staff: j.staff || [], items: j.items || [], bills: j.bills || [] };
+  payee = j.payee || "";
+  if (document.activeElement !== $("cfgPayee")) $("cfgPayee").value = payee;
+  renderAdmin();
+}
+function startAdmin(){
+  $("admin").hidden = false;
+  document.querySelector("header p").textContent = "スタッフの請求をまとめて確認・支払管理する画面です。";
+  $("adMonth").value = thisMonth();
+  $("adMonth").addEventListener("change", renderAdmin);
+  $("adReload").onclick = () => loadAdmin().catch(err => flash($("csvMsg"), err.message, "err"));
+  $("copyCsv").onclick = () => copyText(csvFor($("adMonth").value || thisMonth()), $("csvMsg"));
+  $("cfgForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    try { await api("setPayee", { payee: $("cfgPayee").value.trim() }); await loadAdmin(); flash($("cfgMsg"), "保存しました", "ok"); }
+    catch (err) { flash($("cfgMsg"), err.message, "err"); }
+  });
+  renderAdmin();
+  return loadAdmin();
+}
+
+/* ---------- 起動 ---------- */
+(async () => {
+  const fail = (title, text) => { $("loading").hidden = true; $("staff").hidden = true; $("admin").hidden = true; $("nodbTitle").textContent = title; $("nodbText").textContent = text; $("nodb").hidden = false; };
+  if (!/^https:\/\//.test(API_URL)) return fail("まだ準備中です", "index.html の API_URL に Apps Script のURLが設定されていません（README の手順5）。");
+  if (!TOKEN && !ADMIN) return fail("専用のURLから開いてください", "このページは、オーナーからLINEで届いた専用URLから開くと使えます。");
+  try {
+    if (ADMIN) await startAdmin(); else await startStaff();
+    $("loading").hidden = true;
+  } catch (err) {
+    fail("開けませんでした", err.message);
+  }
+})();
+</script>
+</body>
+</html>
