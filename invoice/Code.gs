@@ -55,7 +55,7 @@ function setup() {
     cfg.appendRow(['ページURL', '']);
     cfg.getRange('B2:B4').setNumberFormat('@');
   }
-  SpreadsheetApp.getUi().alert(
+  notify_(
     '初期設定が終わりました。\n\n' +
     '「設定」シートの「宛名」に請求書の宛名（例：〇〇合同会社 御中）を、\n' +
     '「ページURL」に GitHub Pages のURLを入れてください。\n\n' +
@@ -210,6 +210,11 @@ const ACTIONS = {
 };
 
 /* ================= 内部の処理 ================= */
+
+// スプレッドシートの画面から実行したときはダイアログ、エディタから実行したときは実行ログに表示
+function notify_(msg) {
+  try { SpreadsheetApp.getUi().alert(msg); } catch (e) { Logger.log(msg); }
+}
 
 function sheet_(key) {
   const sh = SpreadsheetApp.getActive().getSheetByName(SHEET[key]);
