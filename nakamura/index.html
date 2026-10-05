@@ -1,0 +1,675 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>中村町 清掃チェックリスト</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700;900&family=Noto+Sans+JP:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: light dark;
+    --bg:#F3F5EF;
+    --surface:#FFFFFF;
+    --surface-2:#EAEDE3;
+    --ink:#20261C;
+    --muted:#69735F;
+    --line:#DCE0D3;
+    --accent:#38664F;
+    --accent-strong:#254938;
+    --accent-soft:#E3EDE5;
+    --accent-ink:#F7FBF6;
+    --alert:#B14A2C;
+    --alert-soft:#F6E7E0;
+    --shadow: 0 1px 2px rgba(32,38,28,0.06), 0 6px 16px rgba(32,38,28,0.05);
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  @media (prefers-color-scheme: dark){
+    :root:not([data-theme="light"]){
+      --bg:#171B15; --surface:#1F251B; --surface-2:#262C21; --ink:#EAEDE2;
+      --muted:#9DA894; --line:#333B2B; --accent:#6FAE8C; --accent-strong:#8FC7A9;
+      --accent-soft:#25342A; --accent-ink:#0F1710; --alert:#E08363; --alert-soft:#3A2A23;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 20px rgba(0,0,0,0.35);
+    }
+  }
+  :root[data-theme="dark"]{
+    --bg:#171B15; --surface:#1F251B; --surface-2:#262C21; --ink:#EAEDE2;
+    --muted:#9DA894; --line:#333B2B; --accent:#6FAE8C; --accent-strong:#8FC7A9;
+    --accent-soft:#25342A; --accent-ink:#0F1710; --alert:#E08363; --alert-soft:#3A2A23;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 8px 20px rgba(0,0,0,0.35);
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:"Noto Sans JP","Hiragino Sans","Yu Gothic",system-ui,sans-serif;
+    padding-inline:16px;
+    padding-block:0 28px;
+    max-width:640px;
+    margin:0 auto;
+  }
+  h1,h2,h3{font-family:"Zen Kaku Gothic New","Noto Sans JP",sans-serif;}
+  .topbar{
+    position:sticky; top:env(safe-area-inset-top,0px); z-index:20;
+    background:var(--bg); padding-block:14px 10px;
+    border-bottom:1px solid var(--line); margin-bottom:14px;
+  }
+  .topbar-row{display:flex; align-items:flex-start; justify-content:space-between; gap:12px;}
+  .brand{display:flex; flex-direction:column; gap:2px;}
+  .brand .place{font-size:12px; letter-spacing:.08em; color:var(--accent-strong); font-weight:700;}
+  .brand h1{font-size:20px; font-weight:900; margin:0; letter-spacing:.01em;}
+  .reset-btn{
+    flex-shrink:0; border:1px solid var(--line); background:var(--surface); color:var(--muted);
+    font-size:12px; font-weight:700; padding:8px 12px; border-radius:999px; cursor:pointer; white-space:nowrap;
+  }
+  .reset-btn:hover{ border-color:var(--accent); color:var(--accent-strong); }
+  .reset-btn:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  .progress-wrap{ margin-top:12px; }
+  .progress-num{
+    display:flex; justify-content:space-between; align-items:baseline;
+    font-size:13px; color:var(--muted); margin-bottom:6px; font-variant-numeric:tabular-nums;
+  }
+  .progress-num strong{ color:var(--ink); font-size:15px; font-weight:700; }
+  .progress-track{ height:8px; border-radius:999px; background:var(--surface-2); overflow:hidden; }
+  .progress-fill{
+    height:100%; background:linear-gradient(90deg,var(--accent),var(--accent-strong));
+    border-radius:999px; transition:width .35s ease;
+  }
+  .status-line{ margin-top:8px; font-size:12px; color:var(--muted); }
+  .status-line .dot{
+    display:inline-block; width:6px;height:6px; border-radius:50%;
+    background:var(--accent); margin-right:6px; vertical-align:middle;
+  }
+  .status-line.offline .dot{ background:var(--alert); }
+  .report-banner{
+    display:flex; gap:10px; align-items:flex-start; background:var(--accent-soft);
+    border:1px solid var(--line); border-radius:12px; padding:12px 14px;
+    margin-bottom:16px; font-size:13px; line-height:1.6;
+  }
+  .report-banner .ic{ font-size:18px; line-height:1; }
+  .report-banner b{ color:var(--accent-strong); }
+  .section{
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    margin-bottom:12px; box-shadow:var(--shadow); overflow:hidden;
+  }
+  .section-head{
+    display:flex; align-items:center; gap:12px; width:100%; padding:14px 16px;
+    background:transparent; border:none; cursor:pointer; text-align:left; color:var(--ink); font:inherit;
+  }
+  .section-head:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+  .section-title{ flex:1; font-size:15px; font-weight:700; min-width:0; }
+  .section-count{ font-size:12px; font-weight:700; color:var(--muted); font-variant-numeric:tabular-nums; flex-shrink:0; }
+  .section-count.done{ color:var(--accent-strong); }
+  .chev{ flex-shrink:0; width:18px;height:18px; color:var(--muted); transition:transform .2s ease; }
+  .section.open .chev{ transform:rotate(180deg); }
+  .section-mini-track{ height:3px; background:var(--surface-2); margin:0; }
+  .section-mini-fill{ height:100%; background:var(--accent); transition:width .3s ease; }
+  .section-body{ display:none; padding:4px 16px 14px; border-top:1px solid var(--line); }
+  .section.open .section-body{ display:block; }
+  .row-sub{ font-size:12.5px; font-weight:700; color:var(--accent-strong); letter-spacing:.02em; margin:14px 0 4px; }
+  .row-sub:first-child{ margin-top:12px; }
+  .row-note{ font-size:12.5px; color:var(--muted); margin:8px 0 2px; }
+  .row-note.italic{ font-style:italic; }
+  label.row-chk{ display:flex; align-items:flex-start; gap:10px; padding:9px 2px; cursor:pointer; border-radius:8px; }
+  label.row-chk:hover{ background:var(--surface-2); }
+  label.row-chk input{
+    appearance:none; -webkit-appearance:none; width:20px;height:20px; flex-shrink:0; margin-top:1px;
+    border:1.6px solid var(--line); border-radius:6px; background:var(--surface); cursor:pointer;
+    position:relative; transition:background .15s, border-color .15s;
+  }
+  label.row-chk input:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+  label.row-chk input:checked{ background:var(--accent); border-color:var(--accent); }
+  label.row-chk input:checked::after{
+    content:""; position:absolute; left:6px; top:2px; width:5px; height:10px;
+    border:solid var(--accent-ink); border-width:0 2px 2px 0; transform:rotate(40deg);
+  }
+  .row-text{ font-size:14px; line-height:1.55; padding-top:1px; }
+  label.row-chk input:checked ~ .row-text{ color:var(--muted); text-decoration:line-through; text-decoration-color:var(--line); }
+  .row-text .tag{
+    display:inline-flex; align-items:center; gap:3px; font-size:11px; font-weight:700;
+    color:var(--accent-strong); background:var(--accent-soft); border-radius:999px;
+    padding:1px 8px; margin-left:6px; vertical-align:middle; white-space:nowrap;
+  }
+
+  .row-text .tag.cond{ color:var(--muted); background:var(--surface-2); }
+
+  .info-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:14px 16px; margin-bottom:16px; box-shadow:var(--shadow);
+    display:flex; gap:12px; flex-wrap:wrap;
+  }
+  .info-field{ flex:1; min-width:140px; display:flex; flex-direction:column; gap:5px; }
+  .info-field label{ font-size:11.5px; font-weight:700; color:var(--muted); letter-spacing:.02em; }
+  .info-field input{
+    font-family:inherit; font-size:14px; color:var(--ink); background:var(--surface-2);
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px; width:100%;
+  }
+  .info-field input:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+
+  .facts-card{ background:var(--surface); border:1px solid var(--line); border-radius:14px; padding:12px 16px; margin-bottom:12px; font-size:13px; line-height:1.7; box-shadow:var(--shadow); }
+  .facts-card dl{ display:grid; grid-template-columns:auto 1fr; gap:4px 12px; margin:0; }
+  .facts-card dt{ color:var(--muted); font-weight:700; white-space:nowrap; }
+  .facts-card dd{ margin:0; min-width:0; }
+  .facts-card .key{ font-family:ui-monospace,Menlo,monospace; font-size:15px; font-weight:700; letter-spacing:.12em; color:var(--accent-strong); }
+  .facts-card a{ color:var(--accent-strong); font-weight:700; }
+
+  .notes-card{
+    background:var(--surface); border:1px solid var(--line); border-radius:14px;
+    padding:16px; margin-bottom:14px; box-shadow:var(--shadow);
+  }
+  .notes-card h2{ font-size:14px; margin:0 0 4px; }
+  .notes-card .hint{ font-size:12px; color:var(--muted); margin:0 0 10px; }
+  .notes-card textarea{
+    width:100%; min-height:90px; resize:vertical; font-family:inherit; font-size:14px;
+    color:var(--ink); background:var(--surface-2); border:1px solid var(--line);
+    border-radius:8px; padding:10px; line-height:1.6;
+  }
+  .notes-card textarea:focus-visible{ outline:2px solid var(--accent); outline-offset:1px; }
+  .save-hint{ font-size:11.5px; color:var(--muted); margin-top:6px; text-align:right; }
+
+  footer{ margin-top:18px; text-align:center; font-size:11.5px; color:var(--muted); }
+  .modal-veil{
+    position:fixed; inset:0; background:rgba(20,24,16,0.45); display:none;
+    align-items:flex-end; justify-content:center; z-index:50; padding:16px;
+    padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));
+  }
+  .modal-veil.show{ display:flex; }
+  .modal-card{ background:var(--surface); border-radius:16px; padding:20px; max-width:420px; width:100%; box-shadow:var(--shadow); }
+  .modal-card h3{ font-size:16px; margin:0 0 8px; }
+  .modal-card p{ font-size:13px; color:var(--muted); line-height:1.6; margin:0 0 16px; }
+  .modal-actions{ display:flex; gap:10px; }
+  .modal-actions button{
+    flex:1; padding:11px; border-radius:10px; font-size:14px; font-weight:700;
+    border:1px solid var(--line); cursor:pointer; font-family:inherit;
+  }
+  .btn-cancel{ background:var(--surface); color:var(--ink); }
+  .btn-confirm{ background:var(--alert); color:#fff; border-color:var(--alert); }
+  .btn-confirm.primary{ background:var(--accent); border-color:var(--accent); }
+
+  .complete-btn{
+    display:block; width:100%; margin:4px 0 20px;
+    padding:16px; border:none; border-radius:14px;
+    background:var(--accent); color:var(--accent-ink);
+    font-family:inherit; font-size:16px; font-weight:700;
+    letter-spacing:.02em; cursor:pointer; box-shadow:var(--shadow);
+  }
+  .complete-btn:hover{ background:var(--accent-strong); }
+  .complete-btn:focus-visible{ outline:2px solid var(--accent-strong); outline-offset:2px; }
+  .complete-btn .sub{
+    display:block; font-size:11.5px; font-weight:500; opacity:.85; margin-top:2px;
+  }
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-row">
+    <div class="brand">
+      <span class="place">中村町 民泊</span>
+      <h1>清掃チェックリスト</h1>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-num"><span>全体の進捗</span><span><strong id="progressCount">0 / 0</strong></span></div>
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+    <div class="status-line" id="statusLine"><span class="dot"></span><span id="statusText">読み込み中…</span></div>
+  </div>
+</div>
+
+<div class="info-card">
+  <div class="info-field">
+    <label for="fieldDate">清掃日</label>
+    <input type="date" id="fieldDate">
+  </div>
+  <div class="info-field">
+    <label for="fieldStaff">担当者名</label>
+    <input type="text" id="fieldStaff" placeholder="例：山田">
+  </div>
+</div>
+
+<div class="facts-card">
+  <dl>
+    <dt>キーボックス</dt><dd><span class="key">0627</span></dd>
+    <dt>ベッド</dt><dd>2階・セミダブル × 4台／1階ソファベッド（最大5名）</dd>
+    <dt>備品・替えシーツ</dt><dd>2階の収納</dd>
+    <dt>ランドリー</dt><dd>ピエロ（徒歩6分）　<a href="https://maps.app.goo.gl/A2E6hCFjZYPVARhE8?g_st=ipc" target="_blank" rel="noopener">地図を開く</a></dd>
+  </dl>
+</div>
+
+<div class="report-banner">
+  <span class="ic">📷</span>
+  <div><b>報告ルール：</b>作業前と作業終了後の写真をLINEで送信。破損・汚損・忘れ物などトラブルを見つけた場合も、その場で写真を撮って同じLINEで報告してください。</div>
+</div>
+
+<div id="sections"></div>
+
+<div class="notes-card">
+  <h2>連絡事項</h2>
+  <p class="hint">気になった点・次の担当者やLizさんへの申し送りがあれば記入してください</p>
+  <textarea id="fieldNotes" placeholder="例：洗剤の在庫が少なくなっています／外のゴミ箱がいっぱい　など"></textarea>
+  <div class="save-hint" id="notesSaveHint"></div>
+</div>
+
+<button class="complete-btn" id="completeBtn" type="button">
+  ✅ 清掃完了を報告する
+  <span class="sub">履歴に記録し、次のゲスト用にチェックをリセットします</span>
+</button>
+
+<footer id="footerNote">清掃スタッフ用・共有チェックリスト</footer>
+
+<div class="modal-veil" id="modalVeil">
+  <div class="modal-card">
+    <h3 id="modalTitle">清掃完了を報告しますか？</h3>
+    <p id="modalBody">この内容を履歴に記録し、次のゲスト用にチェックをリセットします。この操作は元に戻せません。</p>
+    <div class="modal-actions">
+      <button class="btn-cancel" id="modalCancel" type="button">キャンセル</button>
+      <button class="btn-confirm primary" id="modalConfirm" type="button">報告する</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+
+  // ↓↓↓ Google Apps Script をデプロイした後、発行された「ウェブアプリのURL」に書き換えてください ↓↓↓
+  var APPS_SCRIPT_URL = "PUT_YOUR_NAKAMURA_APPS_SCRIPT_URL_HERE";
+  // ↑↑↑ ここを書き換えないと、チェックはこの端末内だけに保存され、他の人とは共有されません ↑↑↑
+
+  var POLL_MS = 5000;
+
+  var SECTIONS = [
+    { id:'s00', title:'作業前', rows:[
+      {t:'chk', id:'s00-1', text:'作業前の写真を撮り、LINEで送信', report:true}
+    ]},
+    { id:'s0', title:'0. 準備：洗濯物', rows:[
+      {t:'note', text:'宿に乾燥機がないため、シーツもタオルもまとめてコインランドリーへ'},
+      {t:'chk', id:'s0-1', text:'使用済みのシーツ・掛け布団カバー・枕カバーを全部剥がす（ソファベッド使用時はその布団カバーも）'},
+      {t:'chk', id:'s0-2', text:'使用済みのバスタオル・フェイスタオル・足拭きマットも回収'},
+      {t:'chk', id:'s0-3', text:'ランドリーバッグに入れる'},
+      {t:'chk', id:'s0-4', text:'コインランドリー「ピエロ」へ移動（徒歩6分）'},
+      {t:'note', text:'宿泊人数によるコースの分岐（どちらか一方）：'},
+      {t:'chk', id:'s0-5', text:'1〜3名 → 洗濯乾燥 10kgコース × 1台'},
+      {t:'chk', id:'s0-6', text:'4〜5名 → 洗濯乾燥 16kgコース × 1台'},
+      {t:'note', italic:true, text:'※ 所要時間は約1時間。乾燥ムラを防ぐため、ドラムの7割程度までに抑える。'}
+    ]},
+    { id:'s1', title:'1. 2階（客室）', rows:[
+      {t:'chk', id:'s1-1', text:'掃き掃除＋クイックルワイパー'},
+      {t:'chk', id:'s1-2', text:'汚れがひどい箇所（テーブル・窓など）は水拭き', cond:true},
+      {t:'chk', id:'s1-3', text:'観葉植物・棚に汚れがないか確認し、あれば水拭き'},
+      {t:'chk', id:'s1-4', text:'ベッド周りも可能な範囲で汚れがないか確認（髪の毛が一本も落ちていない状態が目標）'},
+      {t:'chk', id:'s1-5', text:'リモコンの台数を確認（エアコンなど）'},
+      {t:'sub', text:'きれいなシーツを付ける（セミダブルベッド × 4台）'},
+      {t:'note', text:'替えシーツ・タオルは2階の収納から出す'},
+      {t:'chk', id:'s1-bed1', text:'ベッド1：フィッテッドシーツ＋掛け布団カバー＋枕カバー'},
+      {t:'chk', id:'s1-bed2', text:'ベッド2：フィッテッドシーツ＋掛け布団カバー＋枕カバー'},
+      {t:'chk', id:'s1-bed3', text:'ベッド3：フィッテッドシーツ＋掛け布団カバー＋枕カバー'},
+      {t:'chk', id:'s1-bed4', text:'ベッド4：フィッテッドシーツ＋掛け布団カバー＋枕カバー'},
+      {t:'chk', id:'s1-6', text:'使用するベッドに、バスタオル・フェイスタオルを1枚ずつ重ねて置く'},
+      {t:'note', italic:true, text:'※ 暑い日は必ずエアコンをつけて作業する'},
+      {t:'chk', id:'s1-photo', text:'完成状態の写真を撮り、LINEで送信', report:true},
+      {t:'chk', id:'s1-7', text:'ティッシュがなくなっていたら補充'},
+      {t:'chk', id:'s1-8', text:'作業終了後はエアコンを消し、全室を適温に設定'}
+    ]},
+    { id:'s2', title:'2. 階段', rows:[
+      {t:'chk', id:'s2-1', text:'窓・窓枠の木部に汚れがあれば水拭き', cond:true},
+      {t:'chk', id:'s2-2', text:'階段の隅の汚れがあれば水拭き', cond:true}
+    ]},
+    { id:'s3', title:'3. リビング（1階）', rows:[
+      {t:'sub', text:'ソファベッド'},
+      {t:'chk', id:'s3-1', text:'使用されていたら、布団カバーを外して洗濯物に回す', cond:true},
+      {t:'chk', id:'s3-2', text:'布団を畳んで1階の収納にしまう', cond:true},
+      {t:'chk', id:'s3-3', text:'ソファの形に戻す', cond:true},
+      {t:'chk', id:'s3-4', text:'次回の宿泊が5名の場合は、ソファベッドセットをバッグに入れてソファ横に置く（バスタオル・フェイスタオルはセットの中に畳んで入れる）', cond:true},
+      {t:'sub', text:'清掃'},
+      {t:'chk', id:'s3-5', text:'テーブル・テレビ台・鏡を拭く'},
+      {t:'chk', id:'s3-6', text:'窓・窓枠の木部に汚れがあれば水拭き', cond:true},
+      {t:'chk', id:'s3-7', text:'クローゼット内のキッズスペース：おもちゃを使った形跡があれば拭いて片付ける', cond:true},
+      {t:'chk', id:'s3-8', text:'ソファの汚れ・ゴミをチェック'},
+      {t:'chk', id:'s3-9', text:'ソファのクッションカバーは目視で確認し、汚れていたら洗濯'},
+      {t:'chk', id:'s3-10', text:'ソファ下の掃き掃除'},
+      {t:'chk', id:'s3-11', text:'全体の掃き掃除＋クイックルワイパー'},
+      {t:'chk', id:'s3-12', text:'最後にソファの隙間と裏を確認し、汚れがあれば拭く', cond:true},
+      {t:'chk', id:'s3-13', text:'リモコンの台数を確認（テレビ・エアコンなど）'},
+      {t:'chk', id:'s3-14', text:'室内に匂いがあれば消臭剤を使用し、換気する', cond:true}
+    ]},
+    { id:'s4', title:'4. ダイニング', rows:[
+      {t:'chk', id:'s4-1', text:'全体の掃き掃除＋クイックルワイパー'},
+      {t:'chk', id:'s4-2', text:'シンクを洗う（水垢がない状態にする）'},
+      {t:'chk', id:'s4-3', text:'食器用スポンジは汚れていたら新しいものに交換'},
+      {t:'chk', id:'s4-4', text:'コンロ・作業台を拭く'},
+      {t:'chk', id:'s4-5', text:'出しっぱなしの皿があれば棚にしまう', cond:true},
+      {t:'chk', id:'s4-6', text:'電子レンジ・トースターは庫内もチェックし、汚れや匂いがあればアルコールで拭く'},
+      {t:'chk', id:'s4-7', text:'炊飯器を拭く'},
+      {t:'chk', id:'s4-8', text:'湯沸かしポットに水が残っていれば捨てる', cond:true},
+      {t:'chk', id:'s4-9', text:'窓を拭く（汚れ次第）', cond:true},
+      {t:'chk', id:'s4-10', text:'冷蔵庫の中をチェック・清掃'},
+      {t:'chk', id:'s4-11', text:'リモコンの台数を確認'},
+      {t:'sub', text:'補充・セッティング'},
+      {t:'chk', id:'s4-12', text:'ウェルカムギフトを設置（5枚入り）'},
+      {t:'chk', id:'s4-13', text:'水を1本置く'},
+      {t:'chk', id:'s4-14', text:'ティッシュ・キッチンペーパー・ウェットティッシュ・食器用洗剤がなければ補充（ストックは2階の収納）'}
+    ]},
+    { id:'s5', title:'5. お風呂・トイレ', rows:[
+      {t:'sub', text:'お風呂'},
+      {t:'chk', id:'s5-1', text:'お風呂掃除'},
+      {t:'chk', id:'s5-2', text:'リンス・シャンプー・ボディソープ・クレンジング・洗顔料がなければ補充'},
+      {t:'sub', text:'トイレ（1階のみ）'},
+      {t:'chk', id:'s5-3', text:'便器・床を清掃'},
+      {t:'chk', id:'s5-4', text:'窓・ペーパーホルダーに汚れがあれば水拭き', cond:true},
+      {t:'chk', id:'s5-5', text:'ペーパー補充（予備が必ず3個ある状態にする）'},
+      {t:'chk', id:'s5-6', text:'ハンドソープがなければ補充'},
+      {t:'sub', text:'アメニティ'},
+      {t:'chk', id:'s5-7', text:'歯ブラシを人数分セット（子どもがいれば子ども用歯ブラシも）'},
+      {t:'chk', id:'s5-8', text:'3泊以上：バスタオル・フェイスタオルを2セット置く', cond:true},
+      {t:'chk', id:'s5-9', text:'3泊以上：ティッシュを多めに補充', cond:true},
+      {t:'chk', id:'s5-10', text:'大人数×連泊：キッチンペーパーも多めに準備', cond:true},
+      {t:'chk', id:'s5-11', text:'7泊以上：歯磨き粉を1個追加で置く', cond:true}
+    ]},
+    { id:'s6', title:'6. 玄関', rows:[
+      {t:'chk', id:'s6-1', text:'窓・棚を水拭き'},
+      {t:'chk', id:'s6-2', text:'掃き掃除'},
+      {t:'chk', id:'s6-3', text:'使用した分のスリッパを除菌'}
+    ]},
+    { id:'s7', title:'7. 最終工程', rows:[
+      {t:'sub', text:'ゴミ処理'},
+      {t:'chk', id:'s7-1', text:'客室用のゴミ袋は市販のものを使用'},
+      {t:'note', text:'車あり／車なしで、どちらか一方：'},
+      {t:'chk', id:'s7-2', text:'車のスタッフ：外のゴミ箱のゴミも合わせて吉野町へ運搬（吉野町では業者指定のゴミ袋に詰め替えて捨てる）'},
+      {t:'chk', id:'s7-3', text:'車なしのスタッフ：ゴミを外のゴミ箱に入れる'},
+      {t:'chk', id:'s7-4', text:'外のゴミ箱がいっぱいになりかけていたら報告', cond:true},
+      {t:'sub', text:'仕上げ'},
+      {t:'chk', id:'s7-5', text:'コインランドリーで洗濯が終わったシーツ・タオルを引き取る'},
+      {t:'chk', id:'s7-6', text:'シーツ・タオルを畳む'},
+      {t:'chk', id:'s7-7', text:'2階の収納にしまう'},
+      {t:'chk', id:'s7-8', text:'リクエストがあればベビーベッド・ベビーチェアを出す', cond:true},
+      {t:'chk', id:'s7-photo', text:'作業終了後の写真を撮り、LINEで送信', report:true},
+      {t:'chk', id:'s7-9', text:'キーボックス（0627）に鍵を戻して施錠'}
+    ]},
+    { id:'s8', title:'8. 備品チェック', rows:[
+      {t:'note', text:'足りないものは2階の収納から補充。ストックも不足していたらLizさんに報告。'},
+      {t:'chk', id:'s8-1', text:'ティッシュ（ダイニング・2階寝室）'},
+      {t:'chk', id:'s8-2', text:'トイレ：ペーパー予備3個・消臭スプレー・ハンドソープ'},
+      {t:'chk', id:'s8-3', text:'キッチン：キッチンペーパー・スポンジ・洗剤'},
+      {t:'chk', id:'s8-4', text:'お風呂：シャンプー・リンス・ボディソープ・クレンジング・洗顔料'},
+      {t:'chk', id:'s8-5', text:'2階収納：替えシーツ（4台分＋ソファベッド）・タオル（人数分）・歯ブラシ'},
+      {t:'chk', id:'s8-6', text:'セッティング用：お菓子（ウェルカムギフト）・水'},
+      {t:'chk', id:'s8-7', text:'清掃用具：クイックルワイパーのシート・雑巾'}
+    ]},
+    { id:'s9', title:'9. その他（月次・定期対応）', rows:[
+      {t:'chk', id:'s9-1', text:'月に1回、芳香剤・スプレーの残量をチェック'},
+      {t:'sub', text:'レジオネラ対応（追い焚き配管がある場合）'},
+      {t:'chk', id:'s9-2', text:'シャワーヘッドの分解清掃：半年に1回以上'},
+      {t:'chk', id:'s9-3', text:'循環配管の洗浄（専用洗浄剤）：年1回程度'}
+    ]}
+  ];
+
+  var ALL_IDS = [];
+  var LABELS = {};
+  SECTIONS.forEach(function(sec){
+    sec.rows.forEach(function(r){
+      if(r.t === 'chk'){ ALL_IDS.push(r.id); LABELS[r.id] = { label:r.text, section:sec.title }; }
+    });
+  });
+
+  var checkedState = {};
+  var openSections = {};
+  openSections[SECTIONS[0].id] = true;
+  openSections[SECTIONS[1].id] = true;
+  var configured = APPS_SCRIPT_URL.indexOf('PUT_YOUR') === -1;
+  var pollTimer = null;
+
+  function escapeHtml(s){
+    return String(s).replace(/[&<>"']/g, function(c){
+      return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+  }
+
+  function sectionCounts(sec){
+    var total = 0, done = 0;
+    sec.rows.forEach(function(r){
+      if(r.t === 'chk'){ total++; if(checkedState[r.id]) done++; }
+    });
+    return { total: total, done: done };
+  }
+
+  function render(){
+    var totalAll = ALL_IDS.length;
+    var doneAll = 0;
+    ALL_IDS.forEach(function(id){ if(checkedState[id]) doneAll++; });
+
+    document.getElementById('progressCount').textContent = doneAll + ' / ' + totalAll;
+    var pct = totalAll ? Math.round((doneAll/totalAll)*100) : 0;
+    document.getElementById('progressFill').style.width = pct + '%';
+
+    var wrap = document.getElementById('sections');
+    wrap.innerHTML = '';
+
+    SECTIONS.forEach(function(sec){
+      var counts = sectionCounts(sec);
+      var isOpen = !!openSections[sec.id];
+      var secEl = document.createElement('div');
+      secEl.className = 'section' + (isOpen ? ' open' : '');
+
+      var head = document.createElement('button');
+      head.type = 'button';
+      head.className = 'section-head';
+      head.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+      head.innerHTML =
+        '<span class="section-title">' + escapeHtml(sec.title) + '</span>' +
+        '<span class="section-count' + (counts.done===counts.total && counts.total>0 ? ' done' : '') + '">' + counts.done + '/' + counts.total + '</span>' +
+        '<svg class="chev" viewBox="0 0 20 20" fill="none"><path d="M5 8l5 5 5-5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+      head.addEventListener('click', function(){
+        openSections[sec.id] = !openSections[sec.id];
+        render();
+      });
+
+      var miniTrack = document.createElement('div');
+      miniTrack.className = 'section-mini-track';
+      var miniFill = document.createElement('div');
+      miniFill.className = 'section-mini-fill';
+      miniFill.style.width = (counts.total ? (counts.done/counts.total*100) : 0) + '%';
+      miniTrack.appendChild(miniFill);
+
+      var body = document.createElement('div');
+      body.className = 'section-body';
+
+      sec.rows.forEach(function(r){
+        if(r.t === 'sub'){
+          var subEl = document.createElement('div');
+          subEl.className = 'row-sub';
+          subEl.textContent = r.text;
+          body.appendChild(subEl);
+        } else if(r.t === 'note'){
+          var noteEl = document.createElement('div');
+          noteEl.className = 'row-note' + (r.italic ? ' italic' : '');
+          noteEl.textContent = r.text;
+          body.appendChild(noteEl);
+        } else if(r.t === 'chk'){
+          var rowLabel = document.createElement('label');
+          rowLabel.className = 'row-chk';
+          var input = document.createElement('input');
+          input.type = 'checkbox';
+          input.id = 'chk-' + r.id;
+          input.checked = !!checkedState[r.id];
+          input.addEventListener('change', function(){
+            toggle(r.id, input.checked, r.text, sec.title);
+          });
+          var textEl = document.createElement('span');
+          textEl.className = 'row-text';
+          textEl.textContent = r.text;
+          if(r.report){
+            var tag = document.createElement('span');
+            tag.className = 'tag';
+            tag.textContent = '📷 LINE報告';
+            textEl.appendChild(tag);
+          }
+          if(r.cond){
+            var ct = document.createElement('span');
+            ct.className = 'tag cond';
+            ct.textContent = '状況次第';
+            textEl.appendChild(ct);
+          }
+          rowLabel.appendChild(input);
+          rowLabel.appendChild(textEl);
+          body.appendChild(rowLabel);
+        }
+      });
+
+      secEl.appendChild(head);
+      secEl.appendChild(miniTrack);
+      secEl.appendChild(body);
+      wrap.appendChild(secEl);
+    });
+  }
+
+  function setStatus(mode, text){
+    var line = document.getElementById('statusLine');
+    var txt = document.getElementById('statusText');
+    line.className = 'status-line' + (mode === 'offline' ? ' offline' : '');
+    txt.textContent = text;
+  }
+
+  function apiGet(){
+    return fetch(APPS_SCRIPT_URL, { method: 'GET' }).then(function(res){ return res.json(); });
+  }
+  function apiPost(payload){
+    // text/plain を使うと Apps Script 側へのプリフライト(CORS)を回避できる
+    return fetch(APPS_SCRIPT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(payload)
+    }).then(function(res){ return res.json(); });
+  }
+
+  var sessionSaveTimer = null;
+  function saveSession(){
+    if(!configured) return;
+    var payload = {
+      action: 'session',
+      date: document.getElementById('fieldDate').value,
+      staff: document.getElementById('fieldStaff').value,
+      notes: document.getElementById('fieldNotes').value
+    };
+    var hint = document.getElementById('notesSaveHint');
+    hint.textContent = '保存中…';
+    apiPost(payload).then(function(res){
+      hint.textContent = res.ok ? '保存しました' : '保存できませんでした';
+    }).catch(function(){
+      hint.textContent = '保存できませんでした（通信エラー）';
+    });
+  }
+  function queueSaveSession(){
+    clearTimeout(sessionSaveTimer);
+    sessionSaveTimer = setTimeout(saveSession, 700);
+  }
+  function applySessionFromServer(session){
+    if(!session) return;
+    var dateEl = document.getElementById('fieldDate');
+    var staffEl = document.getElementById('fieldStaff');
+    var notesEl = document.getElementById('fieldNotes');
+    if(document.activeElement !== dateEl) dateEl.value = session.date || '';
+    if(document.activeElement !== staffEl) staffEl.value = session.staff || '';
+    if(document.activeElement !== notesEl) notesEl.value = session.notes || '';
+  }
+  document.getElementById('fieldDate').addEventListener('change', queueSaveSession);
+  document.getElementById('fieldStaff').addEventListener('input', queueSaveSession);
+  document.getElementById('fieldNotes').addEventListener('input', queueSaveSession);
+
+  function toggle(id, value, label, section){
+    checkedState[id] = value;
+    render();
+    if(!configured){
+      setStatus('offline', 'この端末内のみ（保存先が未設定です）');
+      return;
+    }
+    apiPost({ action:'toggle', id:id, value:value, label:label, section:section })
+      .then(function(res){
+        if(!res.ok){ setStatus('offline', '保存できませんでした：' + (res.error||'')); }
+        else { setStatus('online', 'スタッフ全員と共有中（約' + Math.round(POLL_MS/1000) + '秒ごとに更新）'); }
+      })
+      .catch(function(){ setStatus('offline', '保存できませんでした。通信を確認してください。'); });
+  }
+
+  function reportComplete(){
+    var preResetState = checkedState;
+    var preResetDate = document.getElementById('fieldDate').value;
+    var preResetStaff = document.getElementById('fieldStaff').value;
+    var preResetNotes = document.getElementById('fieldNotes').value;
+
+    checkedState = {};
+    render();
+    document.getElementById('fieldDate').value = '';
+    document.getElementById('fieldStaff').value = '';
+    document.getElementById('fieldNotes').value = '';
+    document.getElementById('notesSaveHint').textContent = '';
+    if(!configured) return;
+    var items = ALL_IDS.map(function(id){
+      return {
+        id: id,
+        label: LABELS[id].label,
+        section: LABELS[id].section,
+        value: !!(preResetState[id])
+      };
+    });
+    apiPost({ action:'reset', date: preResetDate, staff: preResetStaff, notes: preResetNotes, items: items })
+      .then(function(res){
+        if(!res.ok){ setStatus('offline', 'リセットできませんでした：' + (res.error||'')); }
+      })
+      .catch(function(){ setStatus('offline', 'リセットできませんでした。通信を確認してください。'); });
+  }
+
+  function pollOnce(){
+    if(!configured) return;
+    apiGet().then(function(res){
+      if(res && res.ok){
+        checkedState = res.checked || {};
+        render();
+        applySessionFromServer(res.session);
+        setStatus('online', 'スタッフ全員と共有中（約' + Math.round(POLL_MS/1000) + '秒ごとに更新）');
+      } else {
+        setStatus('offline', 'データを取得できませんでした。');
+      }
+    }).catch(function(){
+      setStatus('offline', '通信エラー：URLの設定を確認してください。');
+    });
+  }
+
+  var modalVeil = document.getElementById('modalVeil');
+  var modalBody = document.getElementById('modalBody');
+  document.getElementById('completeBtn').addEventListener('click', function(){
+    var doneAll = 0;
+    ALL_IDS.forEach(function(id){ if(checkedState[id]) doneAll++; });
+    var remaining = ALL_IDS.length - doneAll;
+    modalBody.textContent = remaining > 0
+      ? ('まだ ' + remaining + ' 件、未チェックの項目があります。このまま履歴に記録して、次のゲスト用にチェックをリセットしますか？この操作は元に戻せません。')
+      : 'この内容を履歴に記録し、次のゲスト用にチェックをリセットします。この操作は元に戻せません。';
+    modalVeil.classList.add('show');
+  });
+  document.getElementById('modalCancel').addEventListener('click', function(){ modalVeil.classList.remove('show'); });
+  document.getElementById('modalConfirm').addEventListener('click', function(){ modalVeil.classList.remove('show'); reportComplete(); });
+  modalVeil.addEventListener('click', function(e){ if(e.target === modalVeil) modalVeil.classList.remove('show'); });
+
+  render();
+
+  (function initDate(){
+    var d = new Date();
+    var iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+    var dateEl = document.getElementById('fieldDate');
+    if(!dateEl.value) dateEl.value = iso;
+  })();
+
+  if(!configured){
+    setStatus('offline', '保存先が未設定です（Apps ScriptのURLをindex.htmlに貼ってください）');
+  } else {
+    setStatus('local', '読み込み中…');
+    pollOnce();
+    pollTimer = setInterval(pollOnce, POLL_MS);
+  }
+})();
+</script>
+</body>
+</html>
