@@ -23,6 +23,7 @@ function onOpen() {
     .addItem('① 初期設定（最初に1回）', 'setup')
     .addItem('スタッフを追加してURLを発行', 'addStaff')
     .addItem('スタッフのURLを再表示', 'showStaffUrl')
+    .addItem('スタッフのURLを作り直す（漏れたとき）', 'reissueStaffUrl')
     .addItem('管理画面のURLを表示', 'showAdminUrl')
     .addToUi();
 }
@@ -78,6 +79,26 @@ function showStaffUrl() {
   const ui = SpreadsheetApp.getUi();
   const list = table_('staff').rows.map(r => '・' + (r[1] || '(名前なし)') + '\n' + staffUrl_(r[0])).join('\n\n');
   ui.alert(list || 'まだスタッフがいません。');
+}
+
+function reissueStaffUrl() {
+  const ui = SpreadsheetApp.getUi();
+  const staff = table_('staff').rows;
+  if (!staff.length) return ui.alert('まだスタッフがいません。');
+  const list = staff.map((r, i) => (i + 1) + '. ' + (r[1] || '(名前なし)')).join('\n');
+  const r = ui.prompt('URLを作り直す', '番号を入れてください。古いURLはすぐ使えなくなります。\n入力済みの記録・口座・請求はそのまま引き継がれます。\n\n' + list, ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const s = staff[Number(r.getResponseText().trim()) - 1];
+  if (!s) return ui.alert('その番号のスタッフはいません。');
+  const oldT = s[0], newT = newToken_();
+  withLock_(() => {
+    ['staff', 'items', 'bills'].forEach(key => {
+      const col = key === 'items' ? 2 : 1;
+      const t = table_(key);
+      t.rows.forEach(row => { if (row[col - 1] === oldT) t.sh.getRange(row._row, col).setValue(newT); });
+    });
+  });
+  ui.alert('「' + (s[1] || '') + '」さんの新しいURLです。本人だけに送ってください。\n古いURLはもう使えません。\n\n' + staffUrl_(newT));
 }
 
 function showAdminUrl() {

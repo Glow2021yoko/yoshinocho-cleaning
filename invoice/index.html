@@ -36,6 +36,7 @@ header p{margin:2px 0 0;color:var(--muted);font-size:13px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .grid .full{grid-column:1/-1}
 @media (max-width:440px){.grid{grid-template-columns:1fr}}
+input[type=date],input[type=month]{-webkit-appearance:none;appearance:none;min-width:0;max-width:100%;min-height:42px;display:block;text-align:left}
 input,select,textarea{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:7px;padding:9px 10px}
 input:focus,select:focus,textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
 .yen{position:relative}.yen input{padding-left:26px;font-family:var(--f-num);text-align:right}
