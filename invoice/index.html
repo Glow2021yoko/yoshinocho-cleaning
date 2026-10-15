@@ -76,6 +76,9 @@ pre.slip{white-space:pre-wrap;font-family:var(--f-num);font-size:13px;background
 .sum .v{font-family:var(--f-num);font-size:17px;font-weight:600}
 @media (max-width:440px){.sum{grid-template-columns:1fr 1fr}}
 .note{font-size:12px;color:var(--muted)}
+.who{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;background:var(--accent-soft);color:var(--accent);border-radius:9px;padding:8px 12px;font-size:14px;font-weight:500}
+#loginPin{font-family:var(--f-num);letter-spacing:.4em;font-size:20px}
+#loginPin::placeholder{letter-spacing:0;font-family:var(--f-body);font-size:15px}
 .bill-box{margin-top:14px;background:var(--accent-soft);border-radius:8px;padding:12px 14px}
 .pill.billed{background:var(--accent-soft);color:var(--accent)}
 .bank{font-size:12px;color:var(--muted);overflow-wrap:anywhere}
@@ -121,6 +124,26 @@ img{max-width:100%}
   </header>
 
   <div id="loading" class="card"><p class="empty">読み込み中…</p></div>
+  <div id="whoBar" class="who" hidden>
+    <span><span id="whoName"></span> さんとしてログイン中</span>
+    <button class="small" id="logoutBtn" type="button">ログアウト</button>
+  </div>
+
+  <form id="loginForm" class="card" hidden>
+    <h2>ログイン</h2>
+    <div class="grid">
+      <div class="full"><label class="lbl" for="loginName">お名前</label>
+        <select id="loginName" required><option value="">選んでください</option></select></div>
+      <div class="full"><label class="lbl" for="loginPin">暗証番号（4桁）</label>
+        <input id="loginPin" type="password" inputmode="numeric" autocomplete="off" maxlength="4" pattern="[0-9]{4}" placeholder="4桁の数字" required></div>
+    </div>
+    <div class="spread" style="margin-top:14px">
+      <span class="msg" id="loginMsg"></span>
+      <button class="primary" type="submit" id="loginBtn">ログイン</button>
+    </div>
+    <p class="note" style="margin:10px 0 0">名前が一覧にない、暗証番号がわからないときはオーナーに連絡してください。使い終わったら「ログアウト」を押してください。</p>
+  </form>
+
   <div id="nodb" class="card" hidden>
     <h2 id="nodbTitle">専用のURLから開いてください</h2>
     <p class="note" id="nodbText">このページは、オーナーからLINEで届いた専用URLから開くと使えます。</p>
@@ -150,7 +173,7 @@ img{max-width:100%}
           <div class="full"><label class="lbl" for="bHolder">口座名義（カタカナ）</label><input id="bHolder" maxlength="40" placeholder="例：ヤマダ ハナコ" required></div>
         </div>
         <div class="spread" style="margin-top:12px">
-          <span class="note">口座情報はオーナーと本人にだけ表示されます。</span>
+          <span class="note">口座情報は本人とオーナーだけが見られます。</span>
           <div class="row"><button type="button" id="nameCancel" hidden>キャンセル</button><button class="primary" type="submit">保存</button></div>
         </div>
         <p class="msg" id="nameMsg"></p>
@@ -260,7 +283,7 @@ const API_URL = "https://script.google.com/macros/s/AKfycbyaIBo_SMLdxN7P3ek6SxUm
 
 const $ = id => document.getElementById(id);
 const qs = new URLSearchParams(location.search);
-const TOKEN = qs.get("t") || "";
+let CRED = null;  // {name, pin} — ページを閉じる・ログアウトで消えます
 const ADMIN = qs.get("admin") || "";
 const yen = n => "¥" + (Number(n)||0).toLocaleString("ja-JP");
 const int = v => { const n = Math.round(Number(v)); return Number.isFinite(n) && n > 0 ? n : 0; };
@@ -271,6 +294,8 @@ const jpMonth = m => { const [y,mo] = m.split("-"); return `${y}年${Number(mo)}
 const fmtDate = d => { const [,m,dd] = d.split("-"); return `${Number(m)}/${Number(dd)}`; };
 const slashDate = d => d ? d.replace(/-/g,"/") : "";
 const bankLine = b => b && b.bank ? `${b.bank} ${b.branch} ${b.type} ${b.number} ${b.holder}` : "";
+const maskNo = n => n ? "＊＊＊＊" + String(n).slice(-3) : "";
+const bankLineMasked = b => b && b.bank ? `${b.bank} ${b.branch} ${b.type} ${maskNo(b.number)} ${b.holder}` : "";
 function flash(el, text, kind){ el.textContent = text; el.className = "msg " + (kind||""); if(kind==="ok") setTimeout(()=>{ if(el.textContent===text) el.textContent=""; }, 2500); }
 async function copyText(text, msgEl, fallbackEl){
   try { await navigator.clipboard.writeText(text); flash(msgEl, "コピーしました", "ok"); }
@@ -293,7 +318,7 @@ async function api(action, payload = {}){
   let res;
   try {
     res = await fetch(API_URL, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action, token: TOKEN, admin: ADMIN, ...payload }) });
+      body: JSON.stringify({ action, cred: CRED, admin: ADMIN, ...payload }) });
   } catch { throw new Error("通信できませんでした。電波の良いところでもう一度お試しください"); }
   let j; try { j = await res.json(); } catch { throw new Error("サーバーから正しい返事がありませんでした"); }
   if (!j.ok) throw new Error(j.error || "エラーが発生しました");
@@ -395,12 +420,14 @@ function profileComplete(){ return !!(me.name && me.bank && me.bank.bank && me.b
 function fillProfileForm(){
   const b = me.bank || {};
   $("nameInput").value = me.name || ""; $("bBank").value = b.bank || ""; $("bBranch").value = b.branch || "";
-  $("bType").value = b.type || "普通"; $("bNumber").value = b.number || ""; $("bHolder").value = b.holder || "";
+  $("bType").value = b.type || "普通"; $("bNumber").value = ""; $("bHolder").value = b.holder || "";
+  $("bNumber").required = !b.number;
+  $("bNumber").placeholder = b.number ? `変えるときだけ入力（今：${maskNo(b.number)}）` : "7桁";
 }
 function renderProfile(){
   const ok = profileComplete();
   $("nameShow").hidden = !ok; $("editName").hidden = !ok;
-  if (ok){ $("nameShowName").textContent = me.name; $("nameShowBank").textContent = "振込先：" + bankLine(me.bank); $("nameForm").hidden = true; }
+  if (ok){ $("nameShowName").textContent = me.name; $("nameShowBank").textContent = "振込先：" + bankLineMasked(me.bank); $("nameForm").hidden = true; }
   else { $("nameForm").hidden = false; $("nameCancel").hidden = true; fillProfileForm(); }
   $("entryForm").querySelectorAll("input,select,textarea,button").forEach(el => el.disabled = !ok);
   if (!ok) flash($("fMsg"), "先にお名前と振込先を保存してください", "");
@@ -470,7 +497,11 @@ async function loadMe(){
   renderProfile(); renderMine();
 }
 
-function startStaff(){
+let staffInited = false;
+async function startStaff(){
+  if (staffInited){ await loadMe(); $("staff").hidden = false; return; }
+  await loadMe();   // 暗証番号がちがえばここで止まる（画面は出さない）
+  staffInited = true;
   $("staff").hidden = false;
   $("fDate").value = today(); $("myMonth").value = thisMonth();
   ["fClean","fPark","fOther"].forEach(id => $(id).addEventListener("input", updateFormTotal));
@@ -480,7 +511,7 @@ function startStaff(){
   $("nameForm").addEventListener("submit", async e => {
     e.preventDefault();
     const profile = { name: $("nameInput").value.trim(), bank: $("bBank").value.trim(), branch: $("bBranch").value.trim(), type: $("bType").value, number: $("bNumber").value.replace(/\D/g,""), holder: $("bHolder").value.trim() };
-    if (!/^\d{7,8}$/.test(profile.number)) return flash($("nameMsg"), "口座番号は7桁の数字で入れてください", "err");
+    if (profile.number ? !/^\d{7,8}$/.test(profile.number) : !(me.bank && me.bank.number)) return flash($("nameMsg"), "口座番号は7桁の数字で入れてください", "err");
     const btn = e.submitter; if (btn) btn.disabled = true;
     try { await api("saveProfile", { profile }); await loadMe(); flash($("nameMsg"), "保存しました", "ok"); }
     catch (err) { flash($("nameMsg"), err.message, "err"); }
@@ -520,11 +551,10 @@ function startStaff(){
     $("slip").hidden = false;
     copyText($("slip").textContent, $("slipMsg"), $("slip"));
   };
-  const myExport = kind => { const month = $("myMonth").value || thisMonth(); exportInvoice(kind, TOKEN, me, month, monthItems(myItems, month), myBilled[month], $("slipMsg"), $("myPreview")); };
+  const myExport = kind => { const month = $("myMonth").value || thisMonth(); exportInvoice(kind, me.name, me, month, monthItems(myItems, month), myBilled[month], $("slipMsg"), $("myPreview")); };
   $("pdfBtn").onclick = () => myExport("pdf");
   $("pngBtn").onclick = () => myExport("png");
   renderProfile(); renderMine();
-  return loadMe();
 }
 
 /* ---------- 管理画面 ---------- */
@@ -546,7 +576,7 @@ function renderAdmin(){
     const head = document.createElement("div"); head.className = "spread";
     const left = document.createElement("div"); left.style.minWidth = "0";
     const nm = document.createElement("div"); nm.className="prop"; nm.textContent = sd.name || "名前未登録";
-    const bk = document.createElement("div"); bk.className="bank"; bk.textContent = "振込先：" + (bankLine(sd.bank) || "未登録");
+    const bk = document.createElement("div"); bk.className="bank"; bk.textContent = "振込先：" + (bankLine(sd.bank) || "未登録") + (sd.hasPin === false ? "　※暗証番号なし" : "");
     left.append(nm, bk);
     const right = document.createElement("div"); right.className="row";
     const tt = document.createElement("span"); tt.className="num"; tt.style.fontWeight="600"; tt.textContent = yen(t);
@@ -581,8 +611,8 @@ function renderAdmin(){
     const m = document.createElement("span"); m.className="msg";
     const pb = document.createElement("button"); pb.className="small"; pb.type="button"; pb.textContent = "PDF";
     const ib = document.createElement("button"); ib.className="small"; ib.type="button"; ib.textContent = "画像";
-    pb.onclick = () => exportInvoice("pdf", sd.token, sd, month, list, billed, m, pv);
-    ib.onclick = () => exportInvoice("png", sd.token, sd, month, list, billed, m, pv);
+    pb.onclick = () => exportInvoice("pdf", sd.name, sd, month, list, billed, m, pv);
+    ib.onclick = () => exportInvoice("png", sd.name, sd, month, list, billed, m, pv);
     actions.append(pb, ib, m);
     blk.append(actions, pv);
     box.append(blk);
@@ -629,13 +659,43 @@ function startAdmin(){
   return loadAdmin();
 }
 
+/* ---------- ログイン ---------- */
+function logout(){ CRED = null; location.replace(location.pathname); }
+let idleTimer;
+function bumpIdle(){ clearTimeout(idleTimer); idleTimer = setTimeout(logout, 15 * 60 * 1000); }  // 15分さわらなければ自動ログアウト
+async function startLogin(){
+  const j = await api("names");
+  const sel = $("loginName");
+  for (const n of j.names || []){ const o = document.createElement("option"); o.value = n; o.textContent = n; sel.append(o); }
+  $("loginForm").hidden = false;
+  $("loginForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    const name = sel.value, pin = $("loginPin").value.trim();
+    if (!name) return flash($("loginMsg"), "お名前を選んでください", "err");
+    if (!/^\d{4}$/.test(pin)) return flash($("loginMsg"), "暗証番号は4桁の数字です", "err");
+    $("loginBtn").disabled = true; flash($("loginMsg"), "確認中…", "");
+    CRED = { name, pin };
+    try {
+      await startStaff();
+      $("loginPin").value = ""; $("loginForm").hidden = true; $("loginMsg").textContent = "";
+      $("whoName").textContent = me.name || name; $("whoBar").hidden = false;
+      ["click","keydown","touchstart"].forEach(ev => document.addEventListener(ev, bumpIdle, { passive: true }));
+      bumpIdle();
+    } catch (err) {
+      CRED = null; $("staff").hidden = true; $("loginPin").value = "";
+      flash($("loginMsg"), err.message, "err"); $("loginBtn").disabled = false;
+    }
+  });
+  $("logoutBtn").onclick = logout;
+}
+
 /* ---------- 起動 ---------- */
 (async () => {
   const fail = (title, text) => { $("loading").hidden = true; $("staff").hidden = true; $("admin").hidden = true; $("nodbTitle").textContent = title; $("nodbText").textContent = text; $("nodb").hidden = false; };
   if (!/^https:\/\//.test(API_URL)) return fail("まだ準備中です", "index.html の API_URL に Apps Script のURLが設定されていません（README の手順5）。");
-  if (!TOKEN && !ADMIN) return fail("専用のURLから開いてください", "このページは、オーナーからLINEで届いた専用URLから開くと使えます。");
+  if (qs.has("t")) history.replaceState(null, "", location.pathname);  // 古い個人用URLは使わない
   try {
-    if (ADMIN) await startAdmin(); else await startStaff();
+    if (ADMIN) await startAdmin(); else await startLogin();
     $("loading").hidden = true;
   } catch (err) {
     fail("開けませんでした", err.message);

@@ -8,9 +8,9 @@
 
 const SHEET = { staff: 'スタッフ', items: '記録', bills: '請求', config: '設定' };
 const HEAD = {
-  staff:  ['トークン', '名前', '銀行名', '支店名', '口座種別', '口座番号', '口座名義', '有効', '登録日時'],
-  items:  ['ID', 'トークン', '勤務日', '物件', '清掃費', '駐車場代', 'その他', 'その他内容', 'メモ', '合計', '支払', '支払日', '登録日時', '更新日時'],
-  bills:  ['トークン', '月', '請求日', '更新日時'],
+  staff:  ['ID', '名前', '銀行名', '支店名', '口座種別', '口座番号', '口座名義', '有効', '登録日時', '暗証番号（暗号化）'],
+  items:  ['ID', 'スタッフID', '勤務日', '物件', '清掃費', '駐車場代', 'その他', 'その他内容', 'メモ', '合計', '支払', '支払日', '登録日時', '更新日時'],
+  bills:  ['スタッフID', '月', '請求日', '更新日時'],
   config: ['項目', '値'],
 };
 const TZ = 'Asia/Tokyo';
@@ -21,10 +21,11 @@ const PROPERTIES = ['Grand House（睦町）', 'Good Tiny House（中村町）',
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('清掃請求')
     .addItem('① 初期設定（最初に1回）', 'setup')
-    .addItem('スタッフを追加してURLを発行', 'addStaff')
-    .addItem('スタッフのURLを再表示', 'showStaffUrl')
-    .addItem('スタッフのURLを作り直す（漏れたとき）', 'reissueStaffUrl')
+    .addItem('スタッフを追加（暗証番号を発行）', 'addStaff')
+    .addItem('暗証番号を発行し直す', 'resetPin')
+    .addItem('スタッフ用のURLを表示', 'showStaffUrl')
     .addItem('管理画面のURLを表示', 'showAdminUrl')
+    .addItem('（更新後に1回）シートを最新の形にする', 'migrate')
     .addToUi();
 }
 
@@ -49,6 +50,7 @@ function setup() {
   ss.getSheetByName(SHEET.staff).getRange('H2:H').setDataValidation(cb);
   ss.getSheetByName(SHEET.items).getRange('K2:K').setDataValidation(cb);
 
+  migrate_();
   const cfg = ss.getSheetByName(SHEET.config);
   if (cfg.getLastRow() < 2) {
     cfg.appendRow(['宛名', '']);
@@ -65,40 +67,49 @@ function setup() {
 
 function addStaff() {
   const ui = SpreadsheetApp.getUi();
-  const r = ui.prompt('スタッフを追加', 'スタッフの名前を入れてください（あとで本人が修正できます）', ui.ButtonSet.OK_CANCEL);
+  migrate_();
+  const r = ui.prompt('スタッフを追加', 'スタッフの名前を入れてください（ログイン画面の一覧に出ます）', ui.ButtonSet.OK_CANCEL);
   if (r.getSelectedButton() !== ui.Button.OK) return;
   const name = r.getResponseText().trim();
-  const t = newToken_();
-  const sh = sheet_('staff');
-  sh.appendRow([t, name, '', '', '普通', '', '', true, now_()]);
-  ui.alert('「' + name + '」さん専用のURLです。LINEで送ってください。\n\n' + staffUrl_(t) +
-    '\n\n※このURLを知っている人は、この人として入力できます。他の人に転送しないよう伝えてください。');
+  if (!name) return ui.alert('名前が空です。');
+  if (table_('staff').rows.some(x => x[1] === name)) return ui.alert('同じ名前のスタッフがいます。名字と名前など、区別できる名前にしてください。');
+  const id = newToken_(), pin = newPin_();
+  sheet_('staff').appendRow([id, name, '', '', '普通', '', '', true, now_(), hashPin_(id, pin)]);
+  ui.alert(pinMessage_(name, pin));
 }
 
-function showStaffUrl() {
+function resetPin() {
   const ui = SpreadsheetApp.getUi();
-  const list = table_('staff').rows.map(r => '・' + (r[1] || '(名前なし)') + '\n' + staffUrl_(r[0])).join('\n\n');
-  ui.alert(list || 'まだスタッフがいません。');
-}
-
-function reissueStaffUrl() {
-  const ui = SpreadsheetApp.getUi();
+  migrate_();
   const staff = table_('staff').rows;
   if (!staff.length) return ui.alert('まだスタッフがいません。');
-  const list = staff.map((r, i) => (i + 1) + '. ' + (r[1] || '(名前なし)')).join('\n');
-  const r = ui.prompt('URLを作り直す', '番号を入れてください。古いURLはすぐ使えなくなります。\n入力済みの記録・口座・請求はそのまま引き継がれます。\n\n' + list, ui.ButtonSet.OK_CANCEL);
+  const list = staff.map((r, i) => (i + 1) + '. ' + (r[1] || '(名前なし)') + (r[9] ? '' : '　← 暗証番号なし')).join('\n');
+  const r = ui.prompt('暗証番号を発行し直す', '番号を入れてください。前の暗証番号は使えなくなります。\n\n' + list, ui.ButtonSet.OK_CANCEL);
   if (r.getSelectedButton() !== ui.Button.OK) return;
   const s = staff[Number(r.getResponseText().trim()) - 1];
   if (!s) return ui.alert('その番号のスタッフはいません。');
-  const oldT = s[0], newT = newToken_();
-  withLock_(() => {
-    ['staff', 'items', 'bills'].forEach(key => {
-      const col = key === 'items' ? 2 : 1;
-      const t = table_(key);
-      t.rows.forEach(row => { if (row[col - 1] === oldT) t.sh.getRange(row._row, col).setValue(newT); });
-    });
-  });
-  ui.alert('「' + (s[1] || '') + '」さんの新しいURLです。本人だけに送ってください。\n古いURLはもう使えません。\n\n' + staffUrl_(newT));
+  const pin = newPin_();
+  sheet_('staff').getRange(s._row, 10).setValue(hashPin_(s[0], pin));
+  CacheService.getScriptCache().remove(failKey_(s[0]));
+  ui.alert(pinMessage_(s[1], pin));
+}
+
+function showStaffUrl() {
+  SpreadsheetApp.getUi().alert('スタッフ全員共通のURLです。\n名前を選んで、それぞれの暗証番号でログインします。\n\n' + pageUrl_());
+}
+
+function migrate() {
+  migrate_();
+  const missing = table_('staff').rows.filter(r => !r[9]).map(r => '・' + r[1]);
+  notify_('シートを最新の形にしました。' + (missing.length
+    ? '\n\n次のスタッフは暗証番号がまだありません。「暗証番号を発行し直す」で発行してください。\n' + missing.join('\n')
+    : ''));
+}
+
+function pinMessage_(name, pin) {
+  return '「' + name + '」さんの暗証番号は  ' + pin + '  です。\n本人にだけ伝えてください（この画面を閉じると、もう表示できません）。\n\n' +
+    'LINEで送る文面の例：\n' +
+    '請求はこちらから入力してください。\n' + pageUrl_() + '\n名前を選んで、暗証番号 ' + pin + ' でログインしてください。';
 }
 
 function showAdminUrl() {
@@ -127,8 +138,11 @@ function doPost(e) {
 
 const ACTIONS = {
   /* ---- スタッフ ---- */
+  names() {
+    return { names: table_('staff').rows.filter(r => isTrue_(r[7]) && r[1]).map(r => r[1]).sort((a, b) => a.localeCompare(b, 'ja')) };
+  },
   me(req) {
-    const s = requireStaff_(req.token);
+    const s = requireStaff_(req.cred);
     return {
       profile: staffObj_(s),
       items: table_('items').rows.filter(r => r[1] === s.values[0]).map(itemObj_),
@@ -138,12 +152,14 @@ const ACTIONS = {
   },
   saveProfile(req) {
     return withLock_(() => {
-      const s = requireStaff_(req.token);
+      const s = requireStaff_(req.cred);
       const p = req.profile || {};
       const name = str_(p.name, 40), bank = str_(p.bank, 40), branch = str_(p.branch, 40), holder = str_(p.holder, 40);
       const type = p.type === '当座' ? '当座' : '普通';
-      const number = String(p.number || '').replace(/\D/g, '');
+      let number = String(p.number || '').replace(/\D/g, '');
+      if (!number && s.values[5]) number = String(s.values[5]);  // 空欄なら今の口座番号のまま
       if (!name || !bank || !branch || !holder) throw new Error('すべての項目を入れてください');
+      if (table_('staff').rows.some(x => x[1] === name && x[0] !== s.values[0])) throw new Error('同じ名前のスタッフがいます。区別できる名前にしてください');
       if (!/^\d{7,8}$/.test(number)) throw new Error('口座番号は7桁の数字で入れてください');
       sheet_('staff').getRange(s.row, 2, 1, 6).setValues([[name, bank, branch, type, number, holder]]);
       return {};
@@ -151,7 +167,7 @@ const ACTIONS = {
   },
   addItem(req) {
     return withLock_(() => {
-      const s = requireStaff_(req.token);
+      const s = requireStaff_(req.cred);
       if (!s.values[2] || !s.values[5]) throw new Error('先にお名前と振込先を保存してください');
       const d = itemData_(req.item);
       const id = Utilities.getUuid().replace(/-/g, '').slice(0, 16);
@@ -162,7 +178,7 @@ const ACTIONS = {
   },
   updateItem(req) {
     return withLock_(() => {
-      const s = requireStaff_(req.token);
+      const s = requireStaff_(req.cred);
       const it = ownUnpaidItem_(s, req.id);
       const d = itemData_(req.item);
       sheet_('items').getRange(it.row, 3, 1, 8).setValues([[d.date, d.property, d.cleaning, d.parking, d.otherAmt, d.otherNote, d.memo, d.total]]);
@@ -172,7 +188,7 @@ const ACTIONS = {
   },
   deleteItem(req) {
     return withLock_(() => {
-      const s = requireStaff_(req.token);
+      const s = requireStaff_(req.cred);
       const it = ownUnpaidItem_(s, req.id);
       sheet_('items').deleteRow(it.row);
       return {};
@@ -180,7 +196,7 @@ const ACTIONS = {
   },
   bill(req) {
     return withLock_(() => {
-      const s = requireStaff_(req.token);
+      const s = requireStaff_(req.cred);
       const month = month_(req.month), date = date_(req.date);
       const t = table_('bills');
       const found = t.rows.find(r => r[0] === s.values[0] && r[1] === month);
@@ -191,7 +207,7 @@ const ACTIONS = {
   },
   unbill(req) {
     return withLock_(() => {
-      const s = requireStaff_(req.token);
+      const s = requireStaff_(req.cred);
       const month = month_(req.month);
       const paid = table_('items').rows.some(r => r[1] === s.values[0] && String(r[2]).startsWith(month) && isTrue_(r[10]));
       if (paid) throw new Error('支払済の記録があるため取り消せません');
@@ -206,7 +222,7 @@ const ACTIONS = {
   adminList(req) {
     requireAdmin_(req.admin);
     return {
-      staff: table_('staff').rows.map(r => Object.assign({ token: r[0] }, staffObj_({ values: r }))),
+      staff: table_('staff').rows.map(r => Object.assign({ token: r[0], hasPin: !!r[9] }, staffObj_({ values: r }))),
       items: table_('items').rows.map(r => Object.assign({ token: r[1] }, itemObj_(r))),
       bills: table_('bills').rows.map(r => ({ token: r[0], month: fmt_(r[1]).slice(0, 7), date: fmt_(r[2]) })),
       payee: config_('宛名'),
@@ -269,7 +285,19 @@ function pageUrl_() {
   if (u === '/') throw new Error('「設定」シートの「ページURL」に GitHub Pages のURLを入れてください');
   return u;
 }
-function staffUrl_(t) { return pageUrl_() + '?t=' + t; }
+function newPin_() { let p = ''; while (p.length < 4) p += Math.floor(Math.random() * 10); return p; }
+function hashPin_(id, pin) {
+  return Utilities.base64Encode(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, id + ':' + pin, Utilities.Charset.UTF_8));
+}
+function failKey_(id) { return 'fail_' + id; }
+function migrate_() {
+  const sh = sheet_('staff');
+  if (sh.getRange(1, 10).getValue() !== HEAD.staff[9]) {
+    sh.getRange(1, 1, 1, HEAD.staff.length).setValues([HEAD.staff]).setFontWeight('bold').setBackground('#e9f0ef');
+  }
+  sheet_('items').getRange(1, 2).setValue(HEAD.items[1]);
+  sheet_('bills').getRange(1, 1).setValue(HEAD.bills[0]);
+}
 function newToken_() { return Utilities.getUuid().replace(/-/g, '').slice(0, 24); }
 function now_() { return Utilities.formatDate(new Date(), TZ, 'yyyy-MM-dd HH:mm:ss'); }
 function isTrue_(v) { return v === true || String(v).toUpperCase() === 'TRUE'; }
@@ -278,11 +306,24 @@ function int_(v) { const n = Math.round(Number(v)); return isFinite(n) && n > 0 
 function date_(v) { const s = String(v || ''); if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new Error('日付の形式が正しくありません'); return s; }
 function month_(v) { const s = String(v || ''); if (!/^\d{4}-\d{2}$/.test(s)) throw new Error('月の形式が正しくありません'); return s; }
 
-function requireStaff_(token) {
-  const t = String(token || '');
-  if (t.length < 10) throw new Error('このURLは使えません。オーナーに専用URLをもらってください');
-  const r = table_('staff').rows.find(r => r[0] === t);
-  if (!r || !isTrue_(r[7])) throw new Error('このURLは使えません。オーナーに専用URLをもらってください');
+// 名前＋暗証番号で本人確認。5回まちがえると15分ロック
+function requireStaff_(cred) {
+  cred = cred || {};
+  const name = String(cred.name || ''), pin = String(cred.pin || '');
+  const NG = '名前か暗証番号がちがいます';
+  if (!name || !/^\d{4}$/.test(pin)) throw new Error(NG);
+  const r = table_('staff').rows.find(r => r[1] === name && isTrue_(r[7]));
+  if (!r) throw new Error(NG);
+  if (!r[9]) throw new Error('暗証番号がまだ発行されていません。オーナーに聞いてください');
+  const cache = CacheService.getScriptCache(), key = failKey_(r[0]);
+  const fails = Number(cache.get(key) || 0);
+  if (fails >= 5) throw new Error('暗証番号を5回まちがえたため、15分間ログインできません');
+  if (hashPin_(r[0], pin) !== r[9]) {
+    cache.put(key, String(fails + 1), 900);
+    if (fails + 1 >= 5) throw new Error('暗証番号を5回まちがえたため、15分間ログインできません');
+    throw new Error(NG + (fails + 1 >= 3 ? '（あと' + (4 - fails) + '回まちがえるとロックされます）' : ''));
+  }
+  if (fails) cache.remove(key);
   return { row: r._row, values: r };
 }
 function requireAdmin_(admin) {
