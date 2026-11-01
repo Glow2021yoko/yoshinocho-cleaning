@@ -499,6 +499,7 @@ function renderAdmin(){
       del.disabled = true;
       try { await api("deleteInvoice", { id: v.id }); await loadAdmin(); } catch (er) { flash(m, er.message, "err"); del.disabled = false; }
     };
+    if (v.pdf){ const lk = document.createElement("a"); lk.href = v.pdf; lk.target = "_blank"; lk.rel = "noopener"; lk.className = "small"; lk.textContent = "ドライブのPDF"; lk.style.cssText = "font-size:13px;color:var(--accent)"; actions.append(lk); }
     actions.append(pb, ib, del, m);
     blk.append(actions, pv);
     box.append(blk);
