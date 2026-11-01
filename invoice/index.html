@@ -125,6 +125,14 @@ img{max-width:100%}
 .done .big{font-size:20px;font-weight:700;margin:0 0 6px}
 .done .num{font-size:18px}
 .inv-list{display:flex;flex-direction:column}
+.pay-h{font-size:14px;margin:18px 0 6px;color:var(--muted);font-weight:700;letter-spacing:.04em}
+.pay{display:flex;flex-direction:column}
+.pay-row{display:grid;grid-template-columns:1fr auto;gap:2px 12px;padding:10px 0;border-bottom:1px solid var(--line);align-items:center}
+.pay-row:last-child{border-bottom:none}
+.pay-row .who2{font-weight:700;min-width:0}
+.pay-row .acct{grid-column:1;font-size:12px;color:var(--muted);overflow-wrap:anywhere;min-width:0}
+.pay-row .amt2{grid-row:1/3;grid-column:2;text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:4px}
+.pay-row .amt2 .num{font-size:17px;font-weight:600}
 </style>
 </head>
 <body>
@@ -214,7 +222,10 @@ img{max-width:100%}
         <div><div class="k">未払い</div><div class="v" id="adUnpaid">¥0</div></div>
         <div><div class="k">勤務日数</div><div class="v" id="adCount">0</div></div>
       </div>
-      <div id="adList" class="inv-list" style="margin-top:14px"></div>
+      <h3 class="pay-h">支払い一覧</h3>
+      <div id="adPay" class="pay"></div>
+      <h3 class="pay-h">請求書</h3>
+      <div id="adList" class="inv-list"></div>
       <div class="row" style="margin-top:14px">
         <button id="copyCsv" type="button">この月をCSVでコピー</button>
         <span class="msg" id="csvMsg"></span>
@@ -505,7 +516,35 @@ function renderAdmin(){
     box.append(blk);
   }
   if (!list.length){ const p = document.createElement("p"); p.className="empty"; p.textContent = `${jpMonth(month)}分の請求はまだ届いていません。`; box.append(p); }
+  renderPay(list);
   $("adTotal").textContent = yen(total); $("adUnpaid").textContent = yen(unpaid); $("adCount").textContent = days;
+}
+// 支払い一覧：同じ月・同じ人（名前＋口座）の請求をまとめて1行に
+function renderPay(list){
+  const box = $("adPay"); box.replaceChildren();
+  const groups = new Map();
+  for (const v of list){
+    const key = v.name + "|" + bankLine(v.bank);
+    const g = groups.get(key) || { name: v.name, bank: v.bank, total: 0, unpaid: 0, ids: [], count: 0 };
+    g.total += v.total; g.count++; if (!v.paid){ g.unpaid += v.total; g.ids.push(v.id); }
+    groups.set(key, g);
+  }
+  for (const g of groups.values()){
+    const row = document.createElement("div"); row.className = "pay-row";
+    const nm = document.createElement("div"); nm.className = "who2"; nm.textContent = g.name + (g.count > 1 ? `（請求${g.count}件）` : "");
+    const ac = document.createElement("div"); ac.className = "acct"; ac.textContent = bankLine(g.bank);
+    const a = document.createElement("div"); a.className = "amt2";
+    const n = document.createElement("span"); n.className = "num"; n.textContent = yen(g.total);
+    a.append(n);
+    if (g.unpaid){
+      const b = document.createElement("button"); b.type = "button"; b.className = "pill unpaid"; b.style.border = "none"; b.style.cursor = "pointer";
+      b.textContent = g.unpaid === g.total ? "未払い → 支払済にする" : `未払い ${yen(g.unpaid)} → 支払済にする`;
+      b.onclick = () => setPaid(g.ids, true, b);
+      a.append(b);
+    } else { const t = document.createElement("span"); t.className = "pill paid"; t.textContent = "支払済 ✓"; a.append(t); }
+    row.append(nm, a, ac); box.append(row);
+  }
+  if (!groups.size){ const p = document.createElement("p"); p.className = "empty"; p.textContent = "この月の支払いはありません。"; box.append(p); }
 }
 async function setPaid(ids, paid, btn){
   btn.disabled = true;

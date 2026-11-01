@@ -55,10 +55,12 @@ function setup() {
   if (!has('PDF保存フォルダID')) cfg.appendRow(['PDF保存フォルダID', '']);
   cfg.getRange('B2:B6').setNumberFormat('@');
   pdfFolder_();  // 保存先フォルダを用意（ここでドライブの許可を求められます）
+  setupPaySheet_();
 
   notify_('初期設定が終わりました。\n\n' +
     '「請求書」「明細」シートに、スタッフから届いた請求が入ります。\n' +
     '請求書PDFはドライブの「清掃費の請求書」フォルダに保存されます。\n' +
+    '「支払い」シートに、月・支払先ごとの合計金額が自動で集計されます。\n' +
     '「設定」シートの「通知メール」にアドレスを入れると、届くたびにPDF付きのメールが届きます。\n\n' +
     '（以前の「スタッフ」「記録」「請求」シートはもう使いません。不要なら削除して大丈夫です）');
 }
@@ -159,6 +161,28 @@ const ACTIONS = {
     return withLock_(() => { setConfig_('宛名', str_(req.payee, 60)); return {}; });
   },
 };
+
+/* ================= 支払いシート ================= */
+
+// 「請求書」シートから、月×支払先（名前＋口座）ごとの合計を自動集計するシート。数式なので常に最新。
+function setupPaySheet_() {
+  const ss = SpreadsheetApp.getActive();
+  const sh = ss.getSheetByName('支払い') || ss.insertSheet('支払い', 0);
+  sh.clear();
+  const q = "select I, C, D, E, F, G, H, sum(N), count(A) where A is not null and C is not null " +
+            "group by I, C, D, E, F, G, H order by I desc, C " +
+            "label I '月', C '支払先', D '銀行名', E '支店名', F '種別', G '口座番号', H '口座名義', sum(N) '合計金額', count(A) '請求件数'";
+  sh.getRange('A1').setFormula('=QUERY(\'請求書\'!A:Q, "' + q + '", 1)');
+  sh.getRange('J1:K1').setValues([['未払い金額', '状態']]);
+  sh.getRange('J2').setFormula("=ARRAYFORMULA(IF(A2:A=\"\", \"\", SUMIFS('請求書'!N2:N, '請求書'!I2:I, A2:A, '請求書'!C2:C, B2:B, '請求書'!Q2:Q, FALSE)))");
+  sh.getRange('K2').setFormula("=ARRAYFORMULA(IF(A2:A=\"\", \"\", IF(J2:J=0, \"支払済\", \"未払い\")))");
+  sh.getRange('H:H').setNumberFormat('¥#,##0');
+  sh.getRange('J:J').setNumberFormat('¥#,##0');
+  sh.setFrozenRows(1);
+  sh.getRange('A1:K1').setFontWeight('bold').setBackground('#e9f0ef');
+  sh.getRange('M1').setValue('※このシートは自動で集計されます。直接書き込まないでください。支払済にするときは「請求書」シートの「支払」にチェックを入れるか、管理画面で切り替えてください。')
+    .setFontColor('#666666');
+}
 
 /* ================= 請求書PDF・メール ================= */
 
