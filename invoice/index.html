@@ -167,7 +167,7 @@ img{max-width:100%}
     <div class="card">
       <h2>請求内容</h2>
       <div class="grid">
-        <div><label class="lbl" for="month">何月分</label><input id="month" type="month" required></div>
+        <div><span class="lbl">何月分（勤務日から自動）</span><p id="monthInfo" class="prop" style="margin:10px 0 0">—</p></div>
         <div><label class="lbl" for="billDate">請求日</label><input id="billDate" type="date" required></div>
       </div>
     </div>
@@ -215,8 +215,9 @@ img{max-width:100%}
       <div class="spread">
         <h2 style="margin:0">届いた請求</h2>
         <button class="link" id="adReload" type="button">最新にする</button>
-        <input id="adMonth" type="month" style="width:auto">
+        <label class="row" style="gap:6px;font-size:13px;color:var(--muted)" for="adMonth">支払月 <input id="adMonth" type="month" style="width:auto"></label>
       </div>
+      <p class="note" id="adMonthNote" style="margin:6px 0 0"></p>
       <div class="sum" style="margin-top:12px">
         <div><div class="k">請求合計</div><div class="v" id="adTotal">¥0</div></div>
         <div><div class="k">未払い</div><div class="v" id="adUnpaid">¥0</div></div>
@@ -259,6 +260,8 @@ const int = v => { const n = Math.round(Number(v)); return Number.isFinite(n) &&
 const today = () => { const d = new Date(); d.setMinutes(d.getMinutes()-d.getTimezoneOffset()); return d.toISOString().slice(0,10); };
 const thisMonth = () => today().slice(0,7);
 const sumOf = it => int(it.cleaning)+int(it.parking)+int(it.otherAmt);
+const prevMonth = m => { let [y,mo] = m.split("-").map(Number); mo--; if (!mo){ mo = 12; y--; } return `${y}-${String(mo).padStart(2,"0")}`; };
+const nextMonth = m => { let [y,mo] = m.split("-").map(Number); mo++; if (mo > 12){ mo = 1; y++; } return `${y}-${String(mo).padStart(2,"0")}`; };
 const jpMonth = m => { const [y,mo] = m.split("-"); return `${y}年${Number(mo)}月`; };
 const fmtDate = d => { const [,m,dd] = d.split("-"); return `${Number(m)}/${Number(dd)}`; };
 const slashDate = d => d ? d.replace(/-/g,"/") : "";
@@ -403,8 +406,12 @@ function readLines(){
              parking: int(q(".f-park").value), otherAmt: int(q(".f-other").value), otherNote: q(".f-onote").value.trim() };
   });
 }
+function workMonths(){ return [...new Set(readLines().map(l => (l.date||"").slice(0,7)).filter(Boolean))].sort(); }
 function updateTotal(){
   const ls = readLines();
+  const ms = workMonths();
+  $("monthInfo").textContent = !ms.length ? "—" : ms.length > 1 ? "月がまざっています（月ごとに分けてください）" : `${jpMonth(ms[0])}分（${Number(nextMonth(ms[0]).slice(5))}月払い）`;
+  $("monthInfo").style.color = ms.length > 1 ? "var(--bad)" : "";
   $("total").textContent = yen(ls.reduce((s,l)=>s+sumOf(l),0));
   $("dayCount").textContent = ls.length;
 }
@@ -413,7 +420,7 @@ function readForm(){
     name: $("nameInput").value.trim(),
     bank: { bank: $("bBank").value.trim(), branch: $("bBranch").value.trim(), type: $("bType").value,
             number: $("bNumber").value.replace(/\D/g,""), holder: $("bHolder").value.trim() },
-    month: $("month").value, date: $("billDate").value, note: $("note").value.trim(),
+    month: workMonths()[0] || "", date: $("billDate").value, note: $("note").value.trim(),
     lines: readLines().sort((a,b) => a.date < b.date ? -1 : 1),
   };
 }
@@ -421,7 +428,8 @@ function validate(inv){
   if (!inv.name) return "お名前を入れてください";
   if (!inv.bank.bank || !inv.bank.branch || !inv.bank.holder) return "振込先をすべて入れてください";
   if (!/^\d{7,8}$/.test(inv.bank.number)) return "口座番号は7桁の数字で入れてください";
-  if (!inv.month) return "何月分かを選んでください";
+  const ms = workMonths();
+  if (ms.length > 1) return `勤務日は同じ月の分だけにしてください（${ms.map(jpMonth).join("と")}が混ざっています。月ごとに分けて送ってください）`;
   if (!inv.date) return "請求日を入れてください";
   const ls = readLines();
   for (let i = 0; i < ls.length; i++){
@@ -434,7 +442,7 @@ function validate(inv){
 let lastSent = null;
 function startStaff(){
   $("staff").hidden = false;
-  $("month").value = thisMonth(); $("billDate").value = today();
+  $("billDate").value = today();
   addLine();
   $("addLine").onclick = () => { const el = addLine(); el.querySelector(".f-date").focus(); };
   $("staff").addEventListener("input", () => { if ($("sendMsg").classList.contains("err")) $("sendMsg").textContent = ""; });
@@ -463,7 +471,8 @@ function startStaff(){
 /* ---------- 管理画面 ---------- */
 let invoices = [];
 function renderAdmin(){
-  const month = $("adMonth").value || thisMonth();
+  const payMonth = $("adMonth").value || thisMonth(), month = prevMonth(payMonth);
+  $("adMonthNote").textContent = `${jpMonth(month)}に勤務した分（${Number(month.slice(5))}月末締め・${Number(payMonth.slice(5))}月払い）`;
   const list = invoices.filter(v => v.month === month).sort((a,b) => (a.name||"").localeCompare(b.name||"","ja") || (a.date < b.date ? -1 : 1));
   const box = $("adList"); box.replaceChildren();
   let total = 0, unpaid = 0, days = 0;
@@ -515,7 +524,7 @@ function renderAdmin(){
     blk.append(actions, pv);
     box.append(blk);
   }
-  if (!list.length){ const p = document.createElement("p"); p.className="empty"; p.textContent = `${jpMonth(month)}分の請求はまだ届いていません。`; box.append(p); }
+  if (!list.length){ const p = document.createElement("p"); p.className="empty"; p.textContent = `${jpMonth(month)}勤務分の請求はまだ届いていません。`; box.append(p); }
   renderPay(list);
   $("adTotal").textContent = yen(total); $("adUnpaid").textContent = yen(unpaid); $("adCount").textContent = days;
 }
@@ -553,10 +562,10 @@ async function setPaid(ids, paid, btn){
 }
 function csvFor(month){
   const q = v => `"${String(v??"").replace(/"/g,'""')}"`;
-  const rows = [["受付番号","スタッフ","請求日","勤務日","物件","清掃費","駐車場代","その他","その他内容","小計","支払","振込先"].map(q).join(",")];
-  for (const v of invoices.filter(x => x.month === month)){
+  const rows = [["受付番号","スタッフ","支払月","請求日","勤務日","物件","清掃費","駐車場代","その他","その他内容","小計","支払","振込先"].map(q).join(",")];
+  for (const v of invoices.filter(x => x.month === prevMonth(month))){
     for (const it of v.lines){
-      rows.push([v.id, v.name, v.date, it.date, it.property, int(it.cleaning), int(it.parking), int(it.otherAmt), it.otherNote, sumOf(it), v.paid?"支払済":"未払い", bankLine(v.bank)].map(q).join(","));
+      rows.push([v.id, v.name, month, v.date, it.date, it.property, int(it.cleaning), int(it.parking), int(it.otherAmt), it.otherNote, sumOf(it), v.paid?"支払済":"未払い", bankLine(v.bank)].map(q).join(","));
     }
   }
   return rows.join("\n");

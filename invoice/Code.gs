@@ -55,6 +55,7 @@ function setup() {
   if (!has('PDF保存フォルダID')) cfg.appendRow(['PDF保存フォルダID', '']);
   cfg.getRange('B2:B6').setNumberFormat('@');
   pdfFolder_();  // 保存先フォルダを用意（ここでドライブの許可を求められます）
+  fixMonths_();
   setupPaySheet_();
 
   notify_('初期設定が終わりました。\n\n' +
@@ -169,19 +170,33 @@ function setupPaySheet_() {
   const ss = SpreadsheetApp.getActive();
   const sh = ss.getSheetByName('支払い') || ss.insertSheet('支払い', 0);
   sh.clear();
-  const q = "select I, C, D, E, F, G, H, sum(N), count(A) where A is not null and C is not null " +
+  const q = "select I, C, D, E, F, G, H, sum(N), sum(O) where A is not null and C is not null " +
             "group by I, C, D, E, F, G, H order by I desc, C " +
-            "label I '月', C '支払先', D '銀行名', E '支店名', F '種別', G '口座番号', H '口座名義', sum(N) '合計金額', count(A) '請求件数'";
-  sh.getRange('A1').setFormula('=QUERY(\'請求書\'!A:Q, "' + q + '", 1)');
-  sh.getRange('J1:K1').setValues([['未払い金額', '状態']]);
-  sh.getRange('J2').setFormula("=ARRAYFORMULA(IF(A2:A=\"\", \"\", SUMIFS('請求書'!N2:N, '請求書'!I2:I, A2:A, '請求書'!C2:C, B2:B, '請求書'!Q2:Q, FALSE)))");
-  sh.getRange('K2').setFormula("=ARRAYFORMULA(IF(A2:A=\"\", \"\", IF(J2:J=0, \"支払済\", \"未払い\")))");
-  sh.getRange('H:H').setNumberFormat('¥#,##0');
-  sh.getRange('J:J').setNumberFormat('¥#,##0');
+            "label I '勤務月', C '支払先', D '銀行名', E '支店名', F '種別', G '口座番号', H '口座名義', sum(N) '合計金額', sum(O) '勤務日数'";
+  sh.getRange('A1').setValue('支払月');
+  sh.getRange('A2').setFormula('=ARRAYFORMULA(IF(B2:B="", "", TEXT(EDATE(DATEVALUE(B2:B&"-01"), 1), "yyyy-mm")))');
+  sh.getRange('B1').setFormula('=QUERY(\'請求書\'!A:Q, "' + q + '", 1)');
+  sh.getRange('K1:L1').setValues([['未払い金額', '状態']]);
+  sh.getRange('K2').setFormula("=ARRAYFORMULA(IF(B2:B=\"\", \"\", SUMIFS('請求書'!N2:N, '請求書'!I2:I, B2:B, '請求書'!C2:C, C2:C, '請求書'!Q2:Q, FALSE)))");
+  sh.getRange('L2').setFormula("=ARRAYFORMULA(IF(B2:B=\"\", \"\", IF(K2:K=0, \"支払済\", \"未払い\")))");
+  sh.getRange('I:I').setNumberFormat('¥#,##0');
+  sh.getRange('K:K').setNumberFormat('¥#,##0');
   sh.setFrozenRows(1);
-  sh.getRange('A1:K1').setFontWeight('bold').setBackground('#e9f0ef');
-  sh.getRange('M1').setValue('※このシートは自動で集計されます。直接書き込まないでください。支払済にするときは「請求書」シートの「支払」にチェックを入れるか、管理画面で切り替えてください。')
+  sh.getRange('A1:L1').setFontWeight('bold').setBackground('#e9f0ef');
+  sh.getRange('N1').setValue('※自動で集計されます（月末締め・翌月払い）。直接書き込まないでください。支払済にするときは「請求書」シートの「支払」にチェックを入れるか、管理画面で切り替えてください。')
     .setFontColor('#666666');
+}
+
+// 届いている請求の「対象月（＝勤務月）」を、明細の勤務日から付け直す
+function fixMonths_() {
+  const byId = {};
+  table_('lines').rows.forEach(r => { const m = fmt_(r[2]).slice(0, 7); (byId[r[0]] = byId[r[0]] || {})[m] = ((byId[r[0]] || {})[m] || 0) + 1; });
+  const t = table_('inv');
+  t.rows.forEach(r => {
+    const counts = byId[r[0]]; if (!counts) return;
+    const m = Object.keys(counts).sort((a, b) => counts[b] - counts[a] || (a < b ? -1 : 1))[0];  // いちばん多い月
+    if (fmt_(r[8]).slice(0, 7) !== m) t.sh.getRange(r._row, 9).setValue(m);
+  });
 }
 
 /* ================= 請求書PDF・メール ================= */
@@ -381,7 +396,10 @@ function invoiceData_(x) {
   }).sort((a, b) => a.date < b.date ? -1 : 1);
   const sum = lines.reduce((s, l) => ({ cleaning: s.cleaning + l.cleaning, parking: s.parking + l.parking, other: s.other + l.otherAmt }),
     { cleaning: 0, parking: 0, other: 0 });
-  return { name: name, bank: bank, month: month_(x.month), date: date_(x.date, '請求日'), note: str_(x.note, 300),
+  // 月末締め：勤務日の月がその請求の「何月分」。月をまたぐ請求は受け付けない
+  const months = Array.from(new Set(lines.map(l => l.date.slice(0, 7))));
+  if (months.length > 1) throw new Error('勤務日は同じ月の分だけにしてください（' + months.map(jpMonth_).join('と') + 'が混ざっています。月ごとに分けて送ってください）');
+  return { name: name, bank: bank, month: months[0], date: date_(x.date, '請求日'), note: str_(x.note, 300),
            lines: lines, sum: sum, total: sum.cleaning + sum.parking + sum.other };
 }
 function withLock_(fn) {
